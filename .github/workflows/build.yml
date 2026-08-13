@@ -22,9 +22,14 @@ jobs:
           flutter-version: '3.19.x'
           channel: 'stable'
           
-      - name: Generate Android scaffold
-        run: flutter create . --platforms=android --overwrite
-        
+      - name: Prepare project structure
+        run: |
+          mkdir -p temp_lib
+          cp lib/main.dart temp_lib/main.dart || true
+          flutter create . --org com.cyril.muscu --project-name carnet_musculation --platforms=android --overwrite
+          mkdir -p lib
+          cp temp_lib/main.dart lib/main.dart
+          
       - name: Build APK
         run: flutter build apk --release
         
