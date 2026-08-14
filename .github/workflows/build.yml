@@ -22,14 +22,8 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable'
           
-      - name: Protect code and generate Android structure
-        run: |
-          mkdir -p backup_safe
-          cp lib/main.dart backup_safe/main.dart
-          
-          flutter create . --org com.cyril.muscu --project-name carnet_musculation --platforms=android --overwrite
-          
-          cp backup_safe/main.dart lib/main.dart
+      - name: Ensure Android platform exists
+        run: flutter create . --org com.cyril.muscu --project-name carnet_musculation --platforms=android
           
       - name: Install dependencies & Build APK
         run: |
