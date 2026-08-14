@@ -24,10 +24,20 @@ jobs:
           
       - name: Build in clean isolated folder
         run: |
+          # 1. Créer un projet propre
           flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation --platforms=android
+          
+          # 2. Injecter ton code et config
           rm -rf clean_build/lib/main.dart
           cp -r lib/. clean_build/lib/
           cp pubspec.yaml clean_build/pubspec.yaml
+          
+          # 3. Injecter les fichiers de signature
+          cp android/key.properties clean_build/android/key.properties
+          cp android/app/upload-keystore.jks clean_build/android/app/upload-keystore.jks
+          cp custom_build.gradle clean_build/android/app/build.gradle
+          
+          # 4. Compilation
           cd clean_build
           flutter pub get
           flutter build apk --release
