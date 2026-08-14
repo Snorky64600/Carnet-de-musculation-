@@ -22,17 +22,24 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable'
           
-      - name: Generate Android platform
+      - name: Sauvegarder le code, générer Android, puis restaurer
         run: |
-          rm -rf android
-          flutter create . --org com.cyril.muscu --project-name carnet_musculation --platforms=android
+          # 1. Sauvegarde de ton application
+          mkdir -p safety_backup
+          cp lib/main.dart safety_backup/main.dart
           
-      - name: Install dependencies & Build APK
+          # 2. Génération / mise à jour de la structure Android
+          flutter create . --org com.cyril.muscu --project-name carnet_musculation --platforms=android --overwrite
+          
+          # 3. Restauration de ton application
+          cp safety_backup/main.dart lib/main.dart
+          
+      - name: Installation des dépendances et compilation APK
         run: |
           flutter pub get
           flutter build apk --release
           
-      - name: Upload APK
+      - name: Téléverser l'APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
