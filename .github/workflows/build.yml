@@ -24,11 +24,13 @@ jobs:
           
       - name: Prepare project structure
         run: |
-          mkdir -p temp_lib
-          cp lib/main.dart temp_lib/main.dart || true
+          mkdir -p temp_files
+          cp lib/main.dart temp_files/main.dart || true
+          cp pubspec.yaml temp_files/pubspec.yaml || true
           flutter create . --org com.cyril.muscu --project-name carnet_musculation --platforms=android --overwrite
           mkdir -p lib
-          cp temp_lib/main.dart lib/main.dart
+          cp temp_files/main.dart lib/main.dart
+          cp temp_files/pubspec.yaml pubspec.yaml
           
       - name: Build APK
         run: flutter build apk --release
