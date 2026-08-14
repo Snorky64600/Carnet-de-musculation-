@@ -503,4 +503,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(s['exercice'],
-                                        style: const TextStyle(fontSize: 16, fontWeight: FontW
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
+                                  ),
+                                  Text(s['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                  const SizedBox(width: 8),
+                                  InkWell(
+                                    onTap: () async {
+                                      await DatabaseHelper.instance.supprimerSeance(indexGlobal);
+                                      setState(() {});
+                                    },
+                                    child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                                  ),
+                                ],
+                              ),
+                              const Divider(color: Color(0xFF2D3748), height: 20),
+                              ...List.generate(seriesList.length, (i) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  'Série ${i+1} : ${seriesList[i]['poids']} kg x ${seriesList[i]['reps']} reps',
+                                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+                                ),
+                              )),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
