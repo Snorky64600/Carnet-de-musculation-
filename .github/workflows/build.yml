@@ -22,25 +22,24 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable'
           
-      - name: Sauvegarder code et config, générer Android, puis restaurer
+      - name: Build in clean isolated folder
         run: |
-          mkdir -p safety_backup
-          cp lib/main.dart safety_backup/main.dart
-          cp pubspec.yaml safety_backup/pubspec.yaml
+          # 1. Créer un projet propre dans un sous-dossier
+          flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation --platforms=android
           
-          flutter create . --org com.cyril.muscu --project-name carnet_musculation --platforms=android --overwrite
+          # 2. Injecter ton code et ta configuration dedans
+          rm -rf clean_build/lib/main.dart
+          cp -r lib/. clean_build/lib/
+          cp pubspec.yaml clean_build/pubspec.yaml
           
-          cp safety_backup/main.dart lib/main.dart
-          cp safety_backup/pubspec.yaml pubspec.yaml
-          
-      - name: Installation des dépendances et compilation APK
-        run: |
+          # 3. Se placer dans le dossier, installer et compiler
+          cd clean_build
           flutter pub get
           flutter build apk --release
           
-      - name: Téléverser l'APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: clean_build/build/app/outputs/flutter-apk/app-release.apk
           
