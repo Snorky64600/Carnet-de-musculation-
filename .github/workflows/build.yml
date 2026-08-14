@@ -28,6 +28,9 @@ jobs:
           cp -r temp_project/android ./android
           rm -rf temp_project
           
+      - name: Install dependencies
+        run: flutter pub get
+          
       - name: Build APK
         run: flutter build apk --release
         
