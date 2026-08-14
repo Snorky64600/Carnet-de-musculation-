@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await DatabaseHelper.instance.chargerDonnees();
   runApp(const CarnetMusculationApp());
 }
 
-// --- 1. BASE DE DONNÉES ---
+// --- 1. BASE DE DONNÉES LOCALE ---
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   DatabaseHelper._init();
@@ -20,11 +24,39 @@ class DatabaseHelper {
     'Gainage'
   ];
 
-  void sauvegarderSeance(Map<String, dynamic> seance) => sessionsSauvegardees.add(seance);
+  Future<void> chargerDonnees() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Charger les exercices
+    final String? exercicesString = prefs.getString('exercices_disponibles');
+    if (exercicesString != null) {
+      List<dynamic> decodedExos = jsonDecode(exercicesString);
+      exercicesDisponibles = decodedExos.map((e) => e.toString()).toList();
+    }
+
+    // Charger l'historique des séances
+    final String? sessionsString = prefs.getString('sessions_sauvegardees');
+    if (sessionsString != null) {
+      List<dynamic> decodedSessions = jsonDecode(sessionsString);
+      sessionsSauvegardees = decodedSessions.map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+  }
+
+  Future<void> sauvegarderDonnees() async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setString('exercices_disponibles', jsonEncode(exercicesDisponibles));
+    prefs.setString('sessions_sauvegardees', jsonEncode(sessionsSauvegardees));
+  }
+
+  Future<void> sauvegarderSeance(Map<String, dynamic> seance) async {
+    sessionsSauvegardees.add(seance);
+    await sauvegarderDonnees();
+  }
   
-  void ajouterExercice(String nom) { 
+  Future<void> ajouterExercice(String nom) async { 
     if (!exercicesDisponibles.contains(nom) && nom.trim().isNotEmpty) { 
       exercicesDisponibles.add(nom.trim()); 
+      await sauvegarderDonnees();
     } 
   }
 }
@@ -85,7 +117,7 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-// --- 4. RÉCUPÉRATION (Chrono simple) ---
+// --- 4. RÉCUPÉRATION ---
 class RecoveryScreen extends StatefulWidget {
   const RecoveryScreen({Key? key}) : super(key: key);
   @override
@@ -146,8 +178,8 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
         content: TextField(controller: c, autofocus: true), 
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')), 
-          ElevatedButton(onPressed: () { 
-            DatabaseHelper.instance.ajouterExercice(c.text); 
+          ElevatedButton(onPressed: () async { 
+            await DatabaseHelper.instance.ajouterExercice(c.text); 
             Navigator.pop(context); 
             setState(() {}); 
           }, child: const Text('Ajouter'))
@@ -277,7 +309,7 @@ class _SessionScreenState extends State<SessionScreen> {
           ),
           const SizedBox(height: 30),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               List<Map<String, String>> serieSauvegardee = series.map((s) {
                 return {
                   'poids': s.poidsCtrl.text.isNotEmpty ? s.poidsCtrl.text : '0',
@@ -285,7 +317,7 @@ class _SessionScreenState extends State<SessionScreen> {
                 };
               }).toList();
 
-              DatabaseHelper.instance.sauvegarderSeance({
+              await DatabaseHelper.instance.sauvegarderSeance({
                 'date': DateTime.now().toString().split('.')[0].substring(0, 16), 
                 'exercice': exerciceSelectionne, 
                 'series': serieSauvegardee
@@ -306,10 +338,115 @@ class _SessionScreenState extends State<SessionScreen> {
   }
 }
 
-// --- 7. HISTORIQUE AVEC FILTRE PAR EXERCICE ---
+// --- 7. HISTORIQUE AVEC FILTRE ---
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({Key? key}) : super(key: key);
   @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  String filtreExercice = 'Tous les exercices';
+  
+  @override
+  Widget build(BuildContext context) {
+    final List<String> optionsFiltre = [
+      'Tous les exercices',
+      ...DatabaseHelper.instance.exercicesDisponibles
+    ];
+
+    final toutesLesSessions = DatabaseHelper.instance.sessionsSauvegardees;
+    final sessionsFiltrees = filtreExercice == 'Tous les exercices'
+        ? toutesLesSessions
+        : toutesLesSessions.where((s) => s['exercice'] == filtreExercice).toList();
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Historique & Progression')),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: Colors.grey[900],
+            child: DropdownButtonFormField<String>(
+              value: optionsFiltre.contains(filtreExercice) ? filtreExercice : 'Tous les exercices',
+              dropdownColor: Colors.grey[850],
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'Filtrer par exercice',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: optionsFiltre.map((String nom) {
+                return DropdownMenuItem<String>(
+                  value: nom,
+                  child: Text(nom),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() => filtreExercice = newValue);
+                }
+              },
+            ),
+          ),
+          
+          Expanded(
+            child: sessionsFiltrees.isEmpty 
+              ? const Center(child: Text("Aucune donnée pour cette sélection.", style: TextStyle(color: Colors.grey)))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: sessionsFiltrees.length,
+                  itemBuilder: (context, index) {
+                    final s = sessionsFiltrees[sessionsFiltrees.length - 1 - index];
+                    final List<dynamic> seriesRecuperees = s['series'] ?? [];
+                    
+                    return Card(
+                      color: Colors.grey[850],
+                      margin: const EdgeInsets.only(bottom: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(child: Text(s['exercice'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent))),
+                                Text(s['date'], style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                              ],
+                            ),
+                            const Divider(color: Colors.grey),
+                            const SizedBox(height: 8),
+                            
+                            ...List.generate(seriesRecuperees.length, (i) {
+                              String p = seriesRecuperees[i]['poids']?.toString() ?? '0';
+                              String r = seriesRecuperees[i]['reps']?.toString() ?? '0';
+                              
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 6.0),
+                                child: Row(
+                                  children: [
+                                    Text('Série ${i + 1} : ', style: const TextStyle(fontSize: 15, color: Colors.grey)),
+                                    Text('$p kg ', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                                    const Text('x ', style: TextStyle(fontSize: 15, color: Colors.grey)),
+                                    Text('$r reps', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
