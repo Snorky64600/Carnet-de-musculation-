@@ -22,8 +22,11 @@ jobs:
           flutter-version: '3.19.6'
           channel: 'stable'
           
-      - name: Ensure Android platform exists
-        run: flutter create . --org com.cyril.muscu --project-name carnet_musculation --platforms=android
+      - name: Generate Android folder safely
+        run: |
+          flutter create temp_gen --org com.cyril.muscu --project-name carnet_musculation --platforms=android
+          cp -r temp_gen/android ./android
+          rm -rf temp_gen
           
       - name: Install dependencies & Build APK
         run: |
