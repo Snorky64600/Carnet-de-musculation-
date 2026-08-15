@@ -174,11 +174,17 @@ class RecoveryScreen extends StatefulWidget {
 
 class _RecoveryScreenState extends State<RecoveryScreen> {
   Timer? _timer;
+  int _dureeTotale = 90;
   int _seconds = 90;
   bool _isRunning = false;
 
-  void _startTimer() {
-    setState(() => _isRunning = true);
+  void _startTimer(int seconds) {
+    _timer?.cancel();
+    setState(() {
+      _dureeTotale = seconds;
+      _seconds = seconds;
+      _isRunning = true;
+    });
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (_seconds > 0) {
         setState(() => _seconds--);
@@ -199,26 +205,38 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Chrono Récupération'), backgroundColor: Colors.transparent),
-      body: Center(
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text('${(_seconds ~/ 60).toString().padLeft(2, '0')}:${(_seconds % 60).toString().padLeft(2, '0')}',
                 style: const TextStyle(fontSize: 75, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+            const SizedBox(height: 30),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildChoiceButton(90, '90s'),
+                const SizedBox(width: 10),
+                _buildChoiceButton(180, '180s'),
+                const SizedBox(width: 10),
+                _buildChoiceButton(300, '300s'),
+              ],
+            ),
             const SizedBox(height: 40),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ElevatedButton(
-                  onPressed: _isRunning ? null : _startTimer,
+                  onPressed: _isRunning ? null : () => _startTimer(_dureeTotale),
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
-                  child: const Text('Lancer (90s)', style: TextStyle(fontSize: 16)),
+                  child: Text('Lancer (${_dureeTotale}s)', style: const TextStyle(fontSize: 16)),
                 ),
                 const SizedBox(width: 15),
                 ElevatedButton(
                   onPressed: () {
                     _timer?.cancel();
-                    setState(() { _seconds = 90; _isRunning = false; });
+                    setState(() { _seconds = _dureeTotale; _isRunning = false; });
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
                   child: const Text('Réinitialiser', style: TextStyle(fontSize: 16)),
@@ -228,6 +246,25 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget b_btn(int sec, String label) => _buildChoiceButton(sec, label);
+
+  Widget _buildChoiceButton(int seconds, String label) {
+    bool isSelected = _dureeTotale == seconds;
+    return OutlinedButton(
+      onPressed: () {
+        setState(() {
+          _dureeTotale = seconds;
+          if (!_isRunning) _seconds = seconds;
+        });
+      },
+      style: OutlinedButton.styleFrom(
+        backgroundColor: isSelected ? const Color(0xFF10B981).withOpacity(0.2) : Colors.transparent,
+        side: BorderSide(color: isSelected ? const Color(0xFF10B981) : const Color(0xFF2D3748)),
+      ),
+      child: Text(label, style: TextStyle(color: isSelected ? const Color(0xFF10B981) : Colors.white)),
     );
   }
 }
@@ -322,6 +359,7 @@ class _SessionScreenState extends State<SessionScreen> {
   List<SerieItem> series = [SerieItem()];
   Timer? _restTimer;
   int _currentRest = 0;
+  int _dureeRecupChoisie = 90;
 
   @override
   void initState() {
@@ -329,8 +367,8 @@ class _SessionScreenState extends State<SessionScreen> {
     exerciceActuel = DatabaseHelper.instance.exercicesDisponibles.first;
   }
 
-  void _startRest() {
-    setState(() => _currentRest = 90);
+  void _startRest(int seconds) {
+    setState(() => _currentRest = seconds);
     _restTimer?.cancel();
     _restTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (_currentRest > 0) {
@@ -354,9 +392,44 @@ class _SessionScreenState extends State<SessionScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1D24),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF2D3748)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Récupération :', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                ToggleButtons(
+                  isSelected: [_dureeRecupChoisie == 90, _dureeRecupChoisie == 180, _dureeRecupChoisie == 300],
+                  onPressed: (index) {
+                    setState(() {
+                      if (index == 0) _dureeRecupChoisie = 90;
+                      if (index == 1) _dureeRecupChoisie = 180;
+                      if (index == 2) _dureeRecupChoisie = 300;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  selectedColor: Colors.white,
+                  fillColor: const Color(0xFF0D9488),
+                  color: Colors.grey,
+                  constraints: const BoxConstraints(minHeight: 32, minWidth: 64),
+                  children: const [
+                    Text('90s', style: TextStyle(fontSize: 13)),
+                    Text('180s', style: TextStyle(fontSize: 13)),
+                    Text('300s', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           if (_currentRest > 0)
             Container(
-              margin: const EdgeInsets.only(bottom: 20),
+              margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: const Color(0xFF0D9488).withOpacity(0.2),
@@ -364,8 +437,8 @@ class _SessionScreenState extends State<SessionScreen> {
                 border: Border.all(color: const Color(0xFF0D9488)),
               ),
               child: Center(
-                child: Text('Repos : $_currentRest s',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                child: Text('Repos en cours : $_currentRest s',
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
               ),
             ),
           Container(
@@ -395,10 +468,11 @@ class _SessionScreenState extends State<SessionScreen> {
             child: Row(
               children: [
                 Text('S${i+1}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.timer, color: Color(0xFF10B981), size: 20),
-                  onPressed: _startRest,
+                  icon: const Icon(Icons.timer, color: Color(0xFF10B981), size: 22),
+                  onPressed: () => _startRest(_dureeRecupChoisie),
+                  tooltip: 'Lancer ${_dureeRecupChoisie}s de repos',
                 ),
                 Expanded(
                   child: TextField(
@@ -574,4 +648,3 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 }
-              
