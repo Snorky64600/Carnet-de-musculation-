@@ -24,54 +24,32 @@ jobs:
           
       - name: Build in clean isolated folder
         run: |
-          # 1. Créer un projet propre standard
           flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation --platforms=android
-          
-          # 2. Injecter ton code source et pubspec
           rm -rf clean_build/lib/main.dart
           cp -r lib/. clean_build/lib/
           cp pubspec.yaml clean_build/pubspec.yaml
-          
-          # 3. Copier la clé et le fichier de propriétés depuis la racine
           cp upload-keystore.jks clean_build/android/app/upload-keystore.jks
           cp key.properties clean_build/android/key.properties
           
-          # 4. Injecter proprement la configuration de signature dans le Gradle d'origine
-          python3 - << 'EOF'
-          with open("clean_build/android/app/build.gradle", "r") as f:
-              lines = f.readlines()
-
-          new_lines = []
-          added_signing = False
-
-          for line in lines:
-              if "android {" in line and not added_signing:
-                  new_lines.append(line)
-                  new_lines.append("""    signingConfigs {
-        release {
-            def keystoreProperties = new Properties()
-            def keystorePropertiesFile = rootProject.file('key.properties')
-            if (keystorePropertiesFile.exists()) {
-                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-            }
-            storeFile file(keystoreProperties['storeFile'])
-            storePassword keystoreProperties['storePassword']
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
-        }
-    }
-""")
-                  added_signing = True
-              elif "signingConfig signingConfigs.debug" in line:
-                  new_lines.append(line.replace("signingConfigs.debug", "signingConfigs.release"))
-              else:
-                  new_lines.append(line)
-
-          with open("clean_build/android/app/build.gradle", "w") as f:
-              f.writelines(new_lines)
-          EOF
-
-          # 5. Compilation de l'APK signé en release
+          python3 -c "
+          path = 'clean_build/android/app/build.gradle'
+          with open(path, 'r') as f:
+              content = f.read()
+          signing = '''android {
+              signingConfigs {
+                  release {
+                      storeFile file('upload-keystore.jks')
+                      storePassword 'password'
+                      keyAlias 'upload'
+                      keyPassword 'password'
+                  }
+              }'''
+          content = content.replace('android {', signing, 1)
+          content = content.replace('signingConfig signingConfigs.debug', 'signingConfig signingConfigs.release')
+          with open(path, 'w') as f:
+              f.write(content)
+          "
+          
           cd clean_build
           flutter pub get
           flutter build apk --release
