@@ -13,31 +13,39 @@ void main() async {
 
 class ExerciseModel {
   String nom;
-  String image;
+  List<String> images; // Supporte plusieurs images / animations / vidéos courtes
   List<String> tags;
   List<String> steps;
 
   ExerciseModel({
     required this.nom,
-    this.image = 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600',
+    this.images = const ['https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600'],
     this.tags = const ['Musculation', 'Général'],
     this.steps = const [
-      'Position de départ : Installez-vous correctement sur le poste de travail.',
+      'Position de départ : Installez-vous correctement.',
       'Exécution : Effectuez le mouvement de manière contrôlée.'
     ],
   });
 
   Map<String, dynamic> toJson() => {
     'nom': nom,
-    'image': image,
+    'images': images,
     'tags': tags,
     'steps': steps,
   };
 
   factory ExerciseModel.fromJson(Map<String, dynamic> json) {
+    dynamic imgData = json['images'] ?? json['image'];
+    List<String> imagesList = [];
+    if (imgData is List) {
+      imagesList = List<String>.from(imgData);
+    } else if (imgData is String) {
+      imagesList = [imgData];
+    }
+
     return ExerciseModel(
       nom: json['nom'] ?? '',
-      image: json['image'] ?? 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600',
+      images: imagesList.isNotEmpty ? imagesList : ['https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600'],
       tags: List<String>.from(json['tags'] ?? ['Musculation']),
       steps: List<String>.from(json['steps'] ?? ['Étape 1 : Réaliser le mouvement.']),
     );
@@ -52,17 +60,17 @@ class DatabaseHelper {
   List<ExerciseModel> exercicesDisponibles = [
     ExerciseModel(
       nom: 'Développé couché',
-      image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600',
+      images: ['https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600'],
       tags: ['Poitrine', 'Triceps', 'Force'],
       steps: [
-        'Allongez-vous sur le banc, les yeux sous la barre. Saisissez la barre avec une prise adaptée.',
-        'Décrochez la barre et descendez-la contrôlée jusqu\'au milieu de la poitrine en inspirant.',
-        'Développez la barre vers le haut en expirant.'
+        'Allongez-vous sur le banc, les yeux sous la barre.',
+        'Décrochez et descendez la barre contrôlée jusqu\'au milieu de la poitrine.',
+        'Développez vers le haut en expirant.'
       ],
     ),
     ExerciseModel(
       nom: 'Tirage poitrine',
-      image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=600',
+      images: ['https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=600'],
       tags: ['Dos', 'Biceps', 'Largeur'],
       steps: [
         'Asseyez-vous sur la machine, ajustez les boudins et saisissez la barre.',
@@ -71,7 +79,7 @@ class DatabaseHelper {
     ),
     ExerciseModel(
       nom: 'Squat bulgare',
-      image: 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=600',
+      images: ['https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=600'],
       tags: ['Jambes', 'Fessiers', 'Équilibre'],
       steps: [
         'Placez un pied en arrière sur un support stable.',
@@ -80,7 +88,7 @@ class DatabaseHelper {
     ),
     ExerciseModel(
       nom: 'Face curls à la poulie',
-      image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600',
+      images: ['https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600'],
       tags: ['Épaules', 'Arrière d\'épaule', 'Posture'],
       steps: [
         'Fixez la corde à hauteur des yeux sur la poulie.',
@@ -89,11 +97,11 @@ class DatabaseHelper {
     ),
     ExerciseModel(
       nom: 'Gainage',
-      image: 'https://images.unsplash.com/photo-1566241142559-40e1dab266c6?w=600',
+      images: ['https://images.unsplash.com/photo-1566241142559-40e1dab266c6?w=600'],
       tags: ['Sangle abdominale', 'Core', 'Stabilité'],
       steps: [
         'Placez-vous en appui sur les avant-bras et sur la pointe des pieds.',
-        'Gardez le corps parfaitement aligné en contractant abdos et fessiers.'
+        'Gardez le corps parfaitement aligné.'
       ],
     ),
   ];
@@ -147,8 +155,8 @@ class DatabaseHelper {
     if (index != -1) {
       exercicesDisponibles[index] = modifie;
       for (var session in sessionsSauvegardees) {
-        if (session['exercice'] == ancienNom) {
-          session['exercice'] = modifie.nom;
+        if (session['exercice'] == ancienNom || session['exercice'] == '$ancienNom (par côté)') {
+          session['exercice'] = session['exercice'].toString().contains('(par côté)') ? '${modifie.nom} (par côté)' : modifie.nom;
         }
       }
       await sauvegarder();
@@ -489,10 +497,10 @@ class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderSt
   }
 }
 
-Widget buildExerciseImage(String imagePath) {
-  if (imagePath.startsWith('http')) {
+Widget buildMediaWidget(String path) {
+  if (path.startsWith('http')) {
     return Image.network(
-      imagePath,
+      path,
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) => Container(
         color: const Color(0xFF1A1D24),
@@ -501,7 +509,7 @@ Widget buildExerciseImage(String imagePath) {
     );
   } else {
     return Image.file(
-      File(imagePath),
+      File(path),
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) => Container(
         color: const Color(0xFF1A1D24),
@@ -521,10 +529,15 @@ class ExerciseDetailScreen extends StatelessWidget {
       appBar: AppBar(title: Text(exercise.nom), backgroundColor: Colors.transparent),
       body: ListView(
         children: [
+          // Carrousel d'images / animations
           SizedBox(
-            height: 240,
-            width: double.infinity,
-            child: buildExerciseImage(exercise.image),
+            height: 260,
+            child: PageView.builder(
+              itemCount: exercise.images.length,
+              itemBuilder: (context, index) {
+                return buildMediaWidget(exercise.images[index]);
+              },
+            ),
           ),
           Padding(
             padding: const EdgeInsets.all(20.0),
@@ -601,12 +614,14 @@ class GestionExercicesScreen extends StatefulWidget {
 
 class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
   final ImagePicker _picker = ImagePicker();
+  String _filtreTag = 'Tous';
+  bool _triAlphabetique = true;
 
   void _ouvrirDialogEdition({ExerciseModel? exerciceExistant}) {
     final nomCtrl = TextEditingController(text: exerciceExistant?.nom ?? '');
     final tagsCtrl = TextEditingController(text: exerciceExistant?.tags.join(', ') ?? 'Musculation');
     final stepsCtrl = TextEditingController(text: exerciceExistant?.steps.join('\n') ?? 'Étape 1 : Réaliser le mouvement.');
-    String imagePath = exerciceExistant?.image ?? 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600';
+    List<String> imagesList = List.from(exerciceExistant?.images ?? ['https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600']);
 
     showDialog(
       context: context,
@@ -623,38 +638,72 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                   decoration: const InputDecoration(labelText: 'Nom de l\'exercice', labelStyle: TextStyle(color: Colors.grey)),
                 ),
                 const SizedBox(height: 14),
-                Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: SizedBox(
-                        width: 60,
-                        height: 60,
-                        child: buildExerciseImage(imagePath),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-                          if (image != null) {
-                            setStateDialog(() {
-                              imagePath = image.path;
-                            });
-                          }
-                        },
-                        icon: const Icon(Icons.photo_library, size: 18),
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-                        label: const Text('Choisir photo'),
-                      ),
-                    ),
-                  ],
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Photos / Animations :', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 70,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: imagesList.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == imagesList.length) {
+                        return Container(
+                          width: 70,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2D3748),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.add_a_photo, color: Colors.white),
+                            onPressed: () async {
+                              final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                              if (image != null) {
+                                setStateDialog(() {
+                                  imagesList.add(image.path);
+                                });
+                              }
+                            },
+                          ),
+                        );
+                      }
+                      return Stack(
+                        children: [
+                          Container(
+                            width: 70,
+                            margin: const EdgeInsets.only(right: 8),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: buildMediaWidget(imagesList[index]),
+                            ),
+                          ),
+                          Positioned(
+                            right: 8,
+                            top: 0,
+                            child: GestureDetector(
+                              onTap: () {
+                                setStateDialog(() {
+                                  imagesList.removeAt(index);
+                                });
+                              },
+                              child: Container(
+                                color: Colors.black54,
+                                child: const Icon(Icons.close, size: 16, color: Colors.red),
+                              ),
+                            ),
+                          )
+                        ],
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: tagsCtrl,
-                  decoration: const InputDecoration(labelText: 'Tags (séparés par des virgules)', labelStyle: TextStyle(color: Colors.grey)),
+                  decoration: const InputDecoration(labelText: 'Tags / Mots-clés (séparés par virgules)', labelStyle: TextStyle(color: Colors.grey)),
                 ),
                 const SizedBox(height: 10),
                 TextField(
@@ -676,7 +725,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                 if (nouveauNom.isNotEmpty) {
                   final model = ExerciseModel(
                     nom: nouveauNom,
-                    image: imagePath,
+                    images: imagesList.isNotEmpty ? imagesList : ['https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600'],
                     tags: nouveauxTags.isNotEmpty ? nouveauxTags : ['Musculation'],
                     steps: nouvellesSteps.isNotEmpty ? nouvellesSteps : ['Étape 1 : Réaliser le mouvement.'],
                   );
@@ -700,45 +749,101 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Récupérer tous les tags uniques pour le filtre
+    Set<String> tousLesTags = {'Tous'};
+    for (var exo in DatabaseHelper.instance.exercicesDisponibles) {
+      tousLesTags.addAll(exo.tags);
+    }
+
+    // Filtrer et trier la liste
+    List<ExerciseModel> exercicesAffiches = DatabaseHelper.instance.exercicesDisponibles.where((exo) {
+      if (_filtreTag == 'Tous') return true;
+      return exo.tags.contains(_filtreTag);
+    }).toList();
+
+    if (_triAlphabetique) {
+      exercicesAffiches.sort((a, b) => a.nom.compareTo(b.nom));
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Bibliothèque d\'exercices'), backgroundColor: Colors.transparent),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: DatabaseHelper.instance.exercicesDisponibles.length,
-        itemBuilder: (context, index) {
-          final exercise = DatabaseHelper.instance.exercicesDisponibles[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1D24),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2D3748)),
+      appBar: AppBar(
+        title: const Text('Bibliothèque d\'exercices'),
+        backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            icon: Icon(_triAlphabetique ? Icons.sort_by_alpha : Icons.list, color: Colors.white),
+            tooltip: 'Trier',
+            onPressed: () => setState(() => _triAlphabetique = !_triAlphabetique),
+          )
+        ],
+      ),
+      body: Column(
+        children: [
+          // Barre de filtrage par mot-clé (tag)
+          Container(
+            height: 55,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: tousLesTags.map((tag) {
+                bool isSelected = _filtreTag == tag;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(tag),
+                    selected: isSelected,
+                    selectedColor: const Color(0xFF3B82F6),
+                    backgroundColor: const Color(0xFF1A1D24),
+                    labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.grey),
+                    onSelected: (selected) {
+                      setState(() => _filtreTag = tag);
+                    },
+                  ),
+                );
+              }).toList(),
             ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 50,
-                  height: 50,
-                  child: buildExerciseImage(exercise.image),
-                ),
-              ),
-              title: Text(exercise.nom, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
-              subtitle: Text(exercise.tags.join(' • '), style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ExerciseDetailScreen(exercise: exercise)),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: exercicesAffiches.length,
+              itemBuilder: (context, index) {
+                final exercise = exercicesAffiches[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1D24),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2D3748)),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: buildMediaWidget(exercise.images.first),
+                      ),
+                    ),
+                    title: Text(exercise.nom, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
+                    subtitle: Text(exercise.tags.join(' • '), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => ExerciseDetailScreen(exercise: exercise)),
+                      );
+                    },
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.grey, size: 20),
+                      onPressed: () => _ouvrirDialogEdition(exerciceExistant: exercise),
+                    ),
+                  ),
                 );
               },
-              trailing: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.grey, size: 20),
-                onPressed: () => _ouvrirDialogEdition(exerciceExistant: exercise),
-              ),
             ),
-          );
-        },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF3B82F6),
@@ -766,6 +871,7 @@ class _SessionScreenState extends State<SessionScreen> {
   Timer? _restTimer;
   int _currentRest = 0;
   int _dureeRecupChoisie = 90;
+  bool _estParCote = false;
 
   @override
   void initState() {
@@ -773,7 +879,7 @@ class _SessionScreenState extends State<SessionScreen> {
     exerciceActuel = DatabaseHelper.instance.exercicesDisponibles.first.nom;
   }
 
-  void _startRest(int seconds) {
+  void _startCentralRest(int seconds) {
     setState(() => _currentRest = seconds);
     _restTimer?.cancel();
     _restTimer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -805,29 +911,46 @@ class _SessionScreenState extends State<SessionScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFF2D3748)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                const Text('Récupération :', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                ToggleButtons(
-                  isSelected: [_dureeRecupChoisie == 90, _dureeRecupChoisie == 180, _dureeRecupChoisie == 300],
-                  onPressed: (index) {
-                    setState(() {
-                      if (index == 0) _dureeRecupChoisie = 90;
-                      if (index == 1) _dureeRecupChoisie = 180;
-                      if (index == 2) _dureeRecupChoisie = 300;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  selectedColor: Colors.white,
-                  fillColor: const Color(0xFF0D9488),
-                  color: Colors.grey,
-                  constraints: const BoxConstraints(minHeight: 32, minWidth: 64),
-                  children: const [
-                    Text('90s', style: TextStyle(fontSize: 13)),
-                    Text('180s', style: TextStyle(fontSize: 13)),
-                    Text('300s', style: TextStyle(fontSize: 13)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Récupération :', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                    ToggleButtons(
+                      isSelected: [_dureeRecupChoisie == 90, _dureeRecupChoisie == 180, _dureeRecupChoisie == 300],
+                      onPressed: (index) {
+                        setState(() {
+                          if (index == 0) _dureeRecupChoisie = 90;
+                          if (index == 1) _dureeRecupChoisie = 180;
+                          if (index == 2) _dureeRecupChoisie = 300;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      selectedColor: Colors.white,
+                      fillColor: const Color(0xFF0D9488),
+                      color: Colors.grey,
+                      constraints: const BoxConstraints(minHeight: 32, minWidth: 54),
+                      children: const [
+                        Text('90s', style: TextStyle(fontSize: 12)),
+                        Text('180s', style: TextStyle(fontSize: 12)),
+                        Text('300s', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _startCentralRest(_dureeRecupChoisie),
+                    icon: const Icon(Icons.timer, size: 18),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                    ),
+                    label: Text('Lancer le repos (${_dureeRecupChoisie}s)'),
+                  ),
                 ),
               ],
             ),
@@ -862,7 +985,16 @@ class _SessionScreenState extends State<SessionScreen> {
               onChanged: (v) => setState(() => exerciceActuel = v!),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
+          CheckboxListTile(
+            title: const Text('Exercice unilatéral (par côté)', style: TextStyle(fontSize: 14, color: Colors.grey)),
+            value: _estParCote,
+            activeColor: const Color(0xFF3B82F6),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            onChanged: (val) => setState(() => _estParCote = val ?? false),
+          ),
+          const SizedBox(height: 10),
           ...List.generate(series.length, (i) => Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -874,12 +1006,7 @@ class _SessionScreenState extends State<SessionScreen> {
             child: Row(
               children: [
                 Text('S${i+1}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.timer, color: Color(0xFF10B981), size: 22),
-                  onPressed: () => _startRest(_dureeRecupChoisie),
-                  tooltip: 'Lancer ${_dureeRecupChoisie}s de repos',
-                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
                     controller: series[i].poidsCtrl,
@@ -917,7 +1044,7 @@ class _SessionScreenState extends State<SessionScreen> {
 
               await DatabaseHelper.instance.ajouterSeance({
                 'date': DateTime.now().toString().substring(0, 16),
-                'exercice': exerciceActuel,
+                'exercice': _estParCote ? '$exerciceActuel (par côté)' : exerciceActuel,
                 'series': seriesData,
               });
 
@@ -958,7 +1085,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     
     final sessionsFiltreesAvecIndex = <MapEntry<int, Map<String, dynamic>>>[];
     for (int i = 0; i < toutesLesSessions.length; i++) {
-      if (filtreExercice == 'Tous les exercices' || toutesLesSessions[i]['exercice'] == filtreExercice) {
+      if (filtreExercice == 'Tous les exercices' || toutesLesSessions[i]['exercice'] == filtreExercice || toutesLesSessions[i]['exercice'] == '$filtreExercice (par côté)') {
         sessionsFiltreesAvecIndex.add(MapEntry(i, toutesLesSessions[i]));
       }
     }
@@ -1000,7 +1127,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     itemCount: sessionsFiltreesAvecIndex.length,
                     itemBuilder: (context, index) {
                       final itemReel = sessionsFiltreesAvecIndex[sessionsFiltreesAvecIndex.length - 1 - index];
-            final int indexGlobal = itemReel.key;
+                      final int indexGlobal = itemReel.key;
                       final s = itemReel.value;
                       final List seriesList = s['series'] ?? [];
 
@@ -1054,3 +1181,4 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 }
+       
