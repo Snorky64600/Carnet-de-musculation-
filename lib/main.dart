@@ -21,7 +21,7 @@ class ExerciseModel {
     this.tags = const ['Musculation', 'Général'],
     this.steps = const [
       'Position de départ : Installez-vous correctement sur le poste de travail.',
-      'Exécution : Effectuez le mouvement de manière contrôlée en inspirant puis expirant.'
+      'Exécution : Effectuez le mouvement de manière contrôlée.'
     ],
   });
 
@@ -53,9 +53,9 @@ class DatabaseHelper {
       image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600',
       tags: ['Poitrine', 'Triceps', 'Force'],
       steps: [
-        'Allongez-vous sur le banc, les yeux sous la barre. Saisissez la barre avec une prise légèrement supérieure à la largeur des épaules.',
+        'Allongez-vous sur le banc, les yeux sous la barre. Saisissez la barre avec une prise adaptée.',
         'Décrochez la barre et descendez-la contrôlée jusqu\'au milieu de la poitrine en inspirant.',
-        'Développez la barre vers le haut en expirant pour revenir à la position initiale.'
+        'Développez la barre vers le haut en expirant.'
       ],
     ),
     ExerciseModel(
@@ -63,9 +63,8 @@ class DatabaseHelper {
       image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=600',
       tags: ['Dos', 'Biceps', 'Largeur'],
       steps: [
-        'Asseyez-vous sur la machine, ajustez les boudins de maintien des cuisses et saisissez la barre large.',
-        'Tirez la barre vers le haut de votre poitrine en contractant les omoplates vers l\'arrière et le bas.',
-        'Recontrollez la remontée de la barre en position haute.'
+        'Asseyez-vous sur la machine, ajustez les boudins et saisissez la barre.',
+        'Tirez la barre vers le haut de votre poitrine en contractant les omoplates.'
       ],
     ),
     ExerciseModel(
@@ -73,9 +72,8 @@ class DatabaseHelper {
       image: 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=600',
       tags: ['Jambes', 'Fessiers', 'Équilibre'],
       steps: [
-        'Placez un pied en arrière sur un banc ou un support stable.',
-        'Fléchissez la jambe avant pour descendre le bassin verticalement en gardant le dos bien droit.',
-        'Poussez à travers le talon avant pour remonter.'
+        'Placez un pied en arrière sur un support stable.',
+        'Fléchissez la jambe avant pour descendre le bassin verticalement.'
       ],
     ),
     ExerciseModel(
@@ -83,9 +81,8 @@ class DatabaseHelper {
       image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600',
       tags: ['Épaules', 'Arrière d\'épaule', 'Posture'],
       steps: [
-        'Fixez la corde à hauteur des yeux sur la poulie vis-à-vis.',
-        'Tirez la corde vers votre visage en écartant bien les coudes et en tirant les poignets vers l\'arrière.',
-        'Maintenez la contraction une seconde avant de relâcher lentement.'
+        'Fixez la corde à hauteur des yeux sur la poulie.',
+        'Tirez la corde vers votre visage en écartant les coudes.'
       ],
     ),
     ExerciseModel(
@@ -94,8 +91,7 @@ class DatabaseHelper {
       tags: ['Sangle abdominale', 'Core', 'Stabilité'],
       steps: [
         'Placez-vous en appui sur les avant-bras et sur la pointe des pieds.',
-        'Gardez le corps parfaitement aligné (bassin rentré, abdos et fessiers contractés).',
-        'Maintenez la position en respirant calmement.'
+        'Gardez le corps parfaitement aligné en contractant abdos et fessiers.'
       ],
     ),
   ];
@@ -107,14 +103,11 @@ class DatabaseHelper {
       try {
         List decoded = jsonDecode(exosStr);
         if (decoded.isNotEmpty && decoded.first is String) {
-          // Migration automatique si l'ancien format était une liste de chaînes de caractères
           exercicesDisponibles = decoded.map((nom) => ExerciseModel(nom: nom.toString())).toList();
         } else {
           exercicesDisponibles = decoded.map((e) => ExerciseModel.fromJson(e)).toList();
         }
-      } catch (e) {
-        // Garde la liste par défaut en cas d'erreur
-      }
+      } catch (e) {}
     }
     final String? sessStr = prefs.getString('sessions_sauvegardees');
     if (sessStr != null) {
@@ -140,25 +133,23 @@ class DatabaseHelper {
     await sauvegarder();
   }
 
-  Future<void> ajouterExercice(String nom) async {
-    if (nom.trim().isNotEmpty && !exercicesDisponibles.any((e) => e.nom == nom.trim())) {
-      exercicesDisponibles.add(ExerciseModel(nom: nom.trim()));
+  Future<void> ajouterExerciceComplet(ExerciseModel exo) async {
+    if (exo.nom.trim().isNotEmpty && !exercicesDisponibles.any((e) => e.nom == exo.nom.trim())) {
+      exercicesDisponibles.add(exo);
       await sauvegarder();
     }
   }
 
-  Future<void> modifierExercice(String ancienNom, String nouveauNom) async {
-    if (nouveauNom.trim().isNotEmpty && !exercicesDisponibles.any((e) => e.nom == nouveauNom.trim())) {
-      int index = exercicesDisponibles.indexWhere((e) => e.nom == ancienNom);
-      if (index != -1) {
-        exercicesDisponibles[index].nom = nouveauNom.trim();
-        for (var session in sessionsSauvegardees) {
-          if (session['exercice'] == ancienNom) {
-            session['exercice'] = nouveauNom.trim();
-          }
+  Future<void> modifierExerciceComplet(String ancienNom, ExerciseModel modifie) async {
+    int index = exercicesDisponibles.indexWhere((e) => e.nom == ancienNom);
+    if (index != -1) {
+      exercicesDisponibles[index] = modifie;
+      for (var session in sessionsSauvegardees) {
+        if (session['exercice'] == ancienNom) {
+          session['exercice'] = modifie.nom;
         }
-        await sauvegarder();
       }
+      await sauvegarder();
     }
   }
 }
@@ -260,131 +251,245 @@ class ChronoScreen extends StatefulWidget {
   State<ChronoScreen> createState() => _ChronoScreenState();
 }
 
-class _ChronoScreenState extends State<ChronoScreen> {
+class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  // Stopwatch state (Chronomètre)
   final Stopwatch _stopwatch = Stopwatch();
-  Timer? _timer;
+  Timer? _stopwatchTimer;
 
-  void _startTimer() {
-    if (!_stopwatch.isRunning) {
-      _stopwatch.start();
-      _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-        setState(() {});
-      });
-    }
-  }
+  // Countdown state (Minuteur de repos)
+  Timer? _countdownTimer;
+  int _countdownSeconds = 90;
+  int _currentCountdown = 90;
+  bool _isCountdownRunning = false;
 
-  void _pauseTimer() {
-    if (_stopwatch.isRunning) {
-      _stopwatch.stop();
-      _timer?.cancel();
-      setState(() {});
-    }
-  }
-
-  void _stopTimer() {
-    _stopwatch.stop();
-    _timer?.cancel();
-    setState(() {});
-  }
-
-  void _resetTimer() {
-    _stopwatch.stop();
-    _timer?.cancel();
-    _stopwatch.reset();
-    setState(() {});
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _stopwatchTimer?.cancel();
+    _countdownTimer?.cancel();
+    _tabController.dispose();
     super.dispose();
+  }
+
+  void _startStopwatch() {
+    if (!_stopwatch.isRunning) {
+      _stopwatch.start();
+      _stopwatchTimer = Timer.periodic(const Duration(milliseconds: 100), (_) => setState(() {}));
+    }
+  }
+
+  void _pauseStopwatch() {
+    if (_stopwatch.isRunning) {
+      _stopwatch.stop();
+      _stopwatchTimer?.cancel();
+      setState(() {});
+    }
+  }
+
+  void _stopAndResetStopwatch() {
+    _stopwatch.stop();
+    _stopwatchTimer?.cancel();
+    _stopwatch.reset();
+    setState(() {});
+  }
+
+  void _startCountdown(int seconds) {
+    _countdownTimer?.cancel();
+    setState(() {
+      _countdownSeconds = seconds;
+      _currentCountdown = seconds;
+      _isCountdownRunning = true;
+    });
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_currentCountdown > 0) {
+        setState(() => _currentCountdown--);
+      } else {
+        _countdownTimer?.cancel();
+        setState(() => _isCountdownRunning = false);
+      }
+    });
+  }
+
+  void _pauseCountdown() {
+    _countdownTimer?.cancel();
+    setState(() => _isCountdownRunning = false);
+  }
+
+  void _resetCountdown() {
+    _countdownTimer?.cancel();
+    setState(() {
+      _currentCountdown = _countdownSeconds;
+      _isCountdownRunning = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final duration = _stopwatch.elapsed;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chronométrage'),
+        backgroundColor: Colors.transparent,
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: const Color(0xFF10B981),
+          labelColor: const Color(0xFF10B981),
+          unselectedLabelColor: Colors.grey,
+          tabs: const [
+            Tab(text: 'Chronomètre (Gainage)'),
+            Tab(text: 'Minuteur de Repos'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Onglet 1 : Chronomètre Progressif
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  _formatStopwatchTime(_stopwatch.elapsed),
+                  style: const TextStyle(fontSize: 65, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                ),
+                const SizedBox(height: 50),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _startStopwatch,
+                        icon: const Icon(Icons.play_arrow, color: Colors.white),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        label: const Text('Play', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _pauseStopwatch,
+                        icon: const Icon(Icons.pause, color: Colors.white),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF59E0B),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        label: const Text('Pause', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _stopAndResetStopwatch,
+                        icon: const Icon(Icons.stop, color: Colors.white),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        label: const Text('Stop & Reset', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Onglet 2 : Minuteur de Repos (30s, 60s, 90s, 180s, 300s)
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${(_currentCountdown ~/ 60).toString().padLeft(2, '0')}:${(_currentCountdown % 60).toString().padLeft(2, '0')}',
+                  style: const TextStyle(fontSize: 75, fontWeight: FontWeight.bold, color: Color(0xFF0D9488)),
+                ),
+                const SizedBox(height: 25),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [30, 60, 90, 180, 300].map((sec) {
+                    bool isSelected = _countdownSeconds == sec;
+                    return OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          _countdownSeconds = sec;
+                          _currentCountdown = sec;
+                          _isCountdownRunning = false;
+                          _countdownTimer?.cancel();
+                        });
+                      },
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: isSelected ? const Color(0xFF0D9488).withOpacity(0.3) : Colors.transparent,
+                        side: BorderSide(color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF2D3748)),
+                      ),
+                      child: Text('${sec}s', style: TextStyle(color: isSelected ? const Color(0xFF10B981) : Colors.white)),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 40),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isCountdownRunning ? _pauseCountdown : () => _startCountdown(_currentCountdown),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isCountdownRunning ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text(_isCountdownRunning ? 'Pause' : 'Lancer', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _resetCountdown,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Réinitialiser', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatStopwatchTime(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     final tenths = (duration.inMilliseconds.remainder(1000) ~/ 100);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Chrono Gainage'), backgroundColor: Colors.transparent),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '$minutes:$seconds.$tenths',
-              style: const TextStyle(fontSize: 65, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
-            ),
-            const SizedBox(height: 50),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _startTimer,
-                    icon: const Icon(Icons.play_arrow, color: Colors.white),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    label: const Text('Play', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _pauseTimer,
-                    icon: const Icon(Icons.pause, color: Colors.white),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF59E0B),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    label: const Text('Pause', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _stopTimer,
-                    icon: const Icon(Icons.stop, color: Colors.white),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEF4444),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    label: const Text('Stop', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _resetTimer,
-                    icon: const Icon(Icons.refresh, color: Colors.white),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4B5563),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    label: const Text('Reset', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+    return '$minutes:$seconds.$tenths';
   }
 }
 
@@ -398,7 +503,6 @@ class ExerciseDetailScreen extends StatelessWidget {
       appBar: AppBar(title: Text(exercise.nom), backgroundColor: Colors.transparent),
       body: ListView(
         children: [
-          // Image / Illustration de l'exercice
           SizedBox(
             height: 240,
             width: double.infinity,
@@ -421,7 +525,6 @@ class ExerciseDetailScreen extends StatelessWidget {
                   style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 const SizedBox(height: 12),
-                // Tags des groupes musculaires
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -441,7 +544,6 @@ class ExerciseDetailScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white70),
                 ),
                 const SizedBox(height: 12),
-                // Liste des étapes (Step 1, Step 2...)
                 ...List.generate(exercise.steps.length, (index) => Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(16),
@@ -487,31 +589,71 @@ class GestionExercicesScreen extends StatefulWidget {
 }
 
 class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
-  void _ouvrirDialog({String? ancienNom}) {
-    TextEditingController ctrl = TextEditingController(text: ancienNom ?? '');
+  void _ouvrirDialogEdition({ExerciseModel? exerciceExistant}) {
+    final nomCtrl = TextEditingController(text: exerciceExistant?.nom ?? '');
+    final imageCtrl = TextEditingController(text: exerciceExistant?.image ?? 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600');
+    final tagsCtrl = TextEditingController(text: exerciceExistant?.tags.join(', ') ?? 'Musculation');
+    final stepsCtrl = TextEditingController(text: exerciceExistant?.steps.join('\n') ?? 'Étape 1 : Réaliser le mouvement.');
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF1A1D24),
-        title: Text(ancienNom == null ? 'Nouvel exercice' : 'Modifier l\'exercice'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Nom de l\'exercice', hintStyle: TextStyle(color: Colors.grey)),
+        title: Text(exerciceExistant == null ? 'Nouvel exercice' : 'Modifier l\'exercice'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nomCtrl,
+                decoration: const InputDecoration(labelText: 'Nom de l\'exercice', labelStyle: TextStyle(color: Colors.grey)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: imageCtrl,
+                decoration: const InputDecoration(labelText: 'URL de l\'image (vignette)', labelStyle: TextStyle(color: Colors.grey)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: tagsCtrl,
+                decoration: const InputDecoration(labelText: 'Tags (séparés par des virgules)', labelStyle: TextStyle(color: Colors.grey)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: stepsCtrl,
+                maxLines: 4,
+                decoration: const InputDecoration(labelText: 'Étapes / Steps (une par ligne)', labelStyle: TextStyle(color: Colors.grey)),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             onPressed: () async {
-              if (ancienNom == null) {
-                await DatabaseHelper.instance.ajouterExercice(ctrl.text);
-              } else {
-                await DatabaseHelper.instance.modifierExercice(ancienNom, ctrl.text);
+              final nouveauNom = nomCtrl.text.trim();
+              final nouvelleImage = imageCtrl.text.trim();
+              final nouveauxTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+              final nouvellesSteps = stepsCtrl.text.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+
+              if (nouveauNom.isNotEmpty) {
+                final model = ExerciseModel(
+                  nom: nouveauNom,
+                  image: nouvelleImage.isNotEmpty ? nouvelleImage : 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600',
+                  tags: nouveauxTags.isNotEmpty ? nouveauxTags : ['Musculation'],
+                  steps: nouvellesSteps.isNotEmpty ? nouvellesSteps : ['Étape 1 : Réaliser le mouvement.'],
+                );
+
+                if (exerciceExistant == null) {
+                  await DatabaseHelper.instance.ajouterExerciceComplet(model);
+                } else {
+                  await DatabaseHelper.instance.modifierExerciceComplet(exerciceExistant.nom, model);
+                }
+                Navigator.pop(context);
+                setState(() {});
               }
-              Navigator.pop(context);
-              setState(() {});
             },
-            child: Text(ancienNom == null ? 'Ajouter' : 'Enregistrer'),
+            child: Text(exerciceExistant == null ? 'Ajouter' : 'Enregistrer'),
           )
         ],
       ),
@@ -561,7 +703,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
               },
               trailing: IconButton(
                 icon: const Icon(Icons.edit, color: Colors.grey, size: 20),
-                onPressed: () => _ouvrirDialog(ancienNom: exercise.nom),
+                onPressed: () => _ouvrirDialogEdition(exerciceExistant: exercise),
               ),
             ),
           );
@@ -569,7 +711,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF3B82F6),
-        onPressed: () => _ouvrirDialog(),
+        onPressed: () => _ouvrirDialogEdition(),
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -881,3 +1023,4 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 }
+           
