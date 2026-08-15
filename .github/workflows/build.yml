@@ -32,12 +32,17 @@ jobs:
           cp -r lib/. clean_build/lib/
           cp pubspec.yaml clean_build/pubspec.yaml
           
-          # 3. Injecter les fichiers de signature
-          cp android/key.properties clean_build/android/key.properties
+          # 3. Injecter la clé de signature
           cp android/app/upload-keystore.jks clean_build/android/app/upload-keystore.jks
           cp custom_build.gradle clean_build/android/app/build.gradle
           
-          # 4. Compilation
+          # 4. Créer le fichier key.properties automatiquement à la volée
+          echo "storePassword=password" > clean_build/android/key.properties
+          echo "keyPassword=password" >> clean_build/android/key.properties
+          echo "keyAlias=upload" >> clean_build/android/key.properties
+          echo "storeFile=upload-keystore.jks" >> clean_build/android/key.properties
+          
+          # 5. Compilation
           cd clean_build
           flutter pub get
           flutter build apk --release
