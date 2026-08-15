@@ -248,10 +248,36 @@ class HomeScreen extends StatelessWidget {
               ),
               label: const Text('Historique & Progression', style: TextStyle(fontSize: 15)),
             ),
+            const SizedBox(height: 20),
+            // Zone d'illustration / Image animée dans la zone rouge
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF2D3748)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.network(
+                    // Remplace ce lien par ton URL d'image fixe ou de GIF animé (.gif)
+                    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: const Color(0xFF1A1D24),
+                      child: const Icon(Icons.image, size: 48, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
           ],
         ),
       ),
     );
+  }
+}
+
   }
 }
 
