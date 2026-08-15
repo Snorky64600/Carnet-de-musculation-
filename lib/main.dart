@@ -278,9 +278,6 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-  }
-}
-
 class ChronoScreen extends StatefulWidget {
   const ChronoScreen({Key? key}) : super(key: key);
   @override
