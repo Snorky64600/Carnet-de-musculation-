@@ -24,25 +24,54 @@ jobs:
           
       - name: Build in clean isolated folder
         run: |
-          # 1. Créer un projet propre
+          # 1. Créer un projet propre standard
           flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation --platforms=android
           
-          # 2. Injecter ton code et config
+          # 2. Injecter ton code source et pubspec
           rm -rf clean_build/lib/main.dart
           cp -r lib/. clean_build/lib/
           cp pubspec.yaml clean_build/pubspec.yaml
-          cp custom_build.gradle clean_build/android/app/build.gradle
           
-          # 3. Générer la clé de signature directement depuis le secret GitHub
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > clean_build/android/app/upload-keystore.jks
+          # 3. Copier la clé et le fichier de propriétés depuis la racine
+          cp upload-keystore.jks clean_build/android/app/upload-keystore.jks
+          cp key.properties clean_build/android/key.properties
           
-          # 4. Créer le fichier key.properties automatiquement
-          echo "storePassword=password" > clean_build/android/key.properties
-          echo "keyPassword=password" >> clean_build/android/key.properties
-          echo "keyAlias=upload" >> clean_build/android/key.properties
-          echo "storeFile=upload-keystore.jks" >> clean_build/android/key.properties
-          
-          # 5. Compilation
+          # 4. Injecter proprement la configuration de signature dans le Gradle d'origine
+          python3 - << 'EOF'
+          with open("clean_build/android/app/build.gradle", "r") as f:
+              lines = f.readlines()
+
+          new_lines = []
+          added_signing = False
+
+          for line in lines:
+              if "android {" in line and not added_signing:
+                  new_lines.append(line)
+                  new_lines.append("""    signingConfigs {
+        release {
+            def keystoreProperties = new Properties()
+            def keystorePropertiesFile = rootProject.file('key.properties')
+            if (keystorePropertiesFile.exists()) {
+                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+            }
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+        }
+    }
+""")
+                  added_signing = True
+              elif "signingConfig signingConfigs.debug" in line:
+                  new_lines.append(line.replace("signingConfigs.debug", "signingConfigs.release"))
+              else:
+                  new_lines.append(line)
+
+          with open("clean_build/android/app/build.gradle", "w") as f:
+              f.writelines(new_lines)
+          EOF
+
+          # 5. Compilation de l'APK signé en release
           cd clean_build
           flutter pub get
           flutter build apk --release
@@ -52,3 +81,4 @@ jobs:
         with:
           name: app-release
           path: clean_build/build/app/outputs/flutter-apk/app-release.apk
+          
