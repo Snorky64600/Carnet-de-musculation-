@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -253,12 +255,9 @@ class ChronoScreen extends StatefulWidget {
 
 class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  // Stopwatch state (Chronomètre)
   final Stopwatch _stopwatch = Stopwatch();
   Timer? _stopwatchTimer;
 
-  // Countdown state (Minuteur de repos)
   Timer? _countdownTimer;
   int _countdownSeconds = 90;
   int _currentCountdown = 90;
@@ -350,7 +349,6 @@ class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderSt
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Onglet 1 : Chronomètre Progressif
           Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -412,8 +410,6 @@ class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderSt
               ],
             ),
           ),
-
-          // Onglet 2 : Minuteur de Repos (30s, 60s, 90s, 180s, 300s)
           Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -493,6 +489,28 @@ class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderSt
   }
 }
 
+Widget buildExerciseImage(String imagePath) {
+  if (imagePath.startsWith('http')) {
+    return Image.network(
+      imagePath,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => Container(
+        color: const Color(0xFF1A1D24),
+        child: const Icon(Icons.fitness_center, size: 64, color: Colors.grey),
+      ),
+    );
+  } else {
+    return Image.file(
+      File(imagePath),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => Container(
+        color: const Color(0xFF1A1D24),
+        child: const Icon(Icons.fitness_center, size: 64, color: Colors.grey),
+      ),
+    );
+  }
+}
+
 class ExerciseDetailScreen extends StatelessWidget {
   final ExerciseModel exercise;
   const ExerciseDetailScreen({Key? key, required this.exercise}) : super(key: key);
@@ -506,14 +524,7 @@ class ExerciseDetailScreen extends StatelessWidget {
           SizedBox(
             height: 240,
             width: double.infinity,
-            child: Image.network(
-              exercise.image,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                color: const Color(0xFF1A1D24),
-                child: const Icon(Icons.fitness_center, size: 64, color: Colors.grey),
-              ),
-            ),
+            child: buildExerciseImage(exercise.image),
           ),
           Padding(
             padding: const EdgeInsets.all(20.0),
@@ -579,87 +590,110 @@ class ExerciseDetailScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class GestionExercicesScreen extends StatefulWidget {
+  }class GestionExercicesScreen extends StatefulWidget {
   const GestionExercicesScreen({Key? key}) : super(key: key);
   @override
   State<GestionExercicesScreen> createState() => _GestionExercicesScreenState();
 }
 
 class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
+  final ImagePicker _picker = ImagePicker();
+
   void _ouvrirDialogEdition({ExerciseModel? exerciceExistant}) {
     final nomCtrl = TextEditingController(text: exerciceExistant?.nom ?? '');
-    final imageCtrl = TextEditingController(text: exerciceExistant?.image ?? 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600');
     final tagsCtrl = TextEditingController(text: exerciceExistant?.tags.join(', ') ?? 'Musculation');
     final stepsCtrl = TextEditingController(text: exerciceExistant?.steps.join('\n') ?? 'Étape 1 : Réaliser le mouvement.');
+    String imagePath = exerciceExistant?.image ?? 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600';
 
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        title: Text(exerciceExistant == null ? 'Nouvel exercice' : 'Modifier l\'exercice'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nomCtrl,
-                decoration: const InputDecoration(labelText: 'Nom de l\'exercice', labelStyle: TextStyle(color: Colors.grey)),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: imageCtrl,
-                decoration: const InputDecoration(labelText: 'URL de l\'image (vignette)', labelStyle: TextStyle(color: Colors.grey)),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: tagsCtrl,
-                decoration: const InputDecoration(labelText: 'Tags (séparés par des virgules)', labelStyle: TextStyle(color: Colors.grey)),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: stepsCtrl,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Étapes / Steps (une par ligne)', labelStyle: TextStyle(color: Colors.grey)),
-              ),
-            ],
+      builder: (_) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1D24),
+          title: Text(exerciceExistant == null ? 'Nouvel exercice' : 'Modifier l\'exercice'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nomCtrl,
+                  decoration: const InputDecoration(labelText: 'Nom de l\'exercice', labelStyle: TextStyle(color: Colors.grey)),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        width: 60,
+                        height: 60,
+                        child: buildExerciseImage(imagePath),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                          if (image != null) {
+                            setStateDialog(() {
+                              imagePath = image.path;
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.photo_library, size: 18),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                        label: const Text('Choisir photo'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: tagsCtrl,
+                  decoration: const InputDecoration(labelText: 'Tags (séparés par des virgules)', labelStyle: TextStyle(color: Colors.grey)),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: stepsCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Étapes / Steps (une par ligne)', labelStyle: TextStyle(color: Colors.grey)),
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler', style: TextStyle(color: Colors.grey))),
-          ElevatedButton(
-            onPressed: () async {
-              final nouveauNom = nomCtrl.text.trim();
-              final nouvelleImage = imageCtrl.text.trim();
-              final nouveauxTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-              final nouvellesSteps = stepsCtrl.text.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler', style: TextStyle(color: Colors.grey))),
+            ElevatedButton(
+              onPressed: () async {
+                final nouveauNom = nomCtrl.text.trim();
+                final nouveauxTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                final nouvellesSteps = stepsCtrl.text.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
 
-              if (nouveauNom.isNotEmpty) {
-                final model = ExerciseModel(
-                  nom: nouveauNom,
-                  image: nouvelleImage.isNotEmpty ? nouvelleImage : 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600',
-                  tags: nouveauxTags.isNotEmpty ? nouveauxTags : ['Musculation'],
-                  steps: nouvellesSteps.isNotEmpty ? nouvellesSteps : ['Étape 1 : Réaliser le mouvement.'],
-                );
+                if (nouveauNom.isNotEmpty) {
+                  final model = ExerciseModel(
+                    nom: nouveauNom,
+                    image: imagePath,
+                    tags: nouveauxTags.isNotEmpty ? nouveauxTags : ['Musculation'],
+                    steps: nouvellesSteps.isNotEmpty ? nouvellesSteps : ['Étape 1 : Réaliser le mouvement.'],
+                  );
 
-                if (exerciceExistant == null) {
-                  await DatabaseHelper.instance.ajouterExerciceComplet(model);
-                } else {
-                  await DatabaseHelper.instance.modifierExerciceComplet(exerciceExistant.nom, model);
+                  if (exerciceExistant == null) {
+                    await DatabaseHelper.instance.ajouterExerciceComplet(model);
+                  } else {
+                    await DatabaseHelper.instance.modifierExerciceComplet(exerciceExistant.nom, model);
+                  }
+                  Navigator.pop(context);
+                  setState(() {});
                 }
-                Navigator.pop(context);
-                setState(() {});
-              }
-            },
-            child: Text(exerciceExistant == null ? 'Ajouter' : 'Enregistrer'),
-          )
-        ],
+              },
+              child: Text(exerciceExistant == null ? 'Ajouter' : 'Enregistrer'),
+            )
+          ],
+        ),
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -683,14 +717,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                 child: SizedBox(
                   width: 50,
                   height: 50,
-                  child: Image.network(
-                    exercise.image,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: const Color(0xFF2D3748),
-                      child: const Icon(Icons.fitness_center, color: Colors.white54, size: 24),
-                    ),
-                  ),
+                  child: buildExerciseImage(exercise.image),
                 ),
               ),
               title: Text(exercise.nom, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
@@ -1023,4 +1050,3 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 }
-           
