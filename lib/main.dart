@@ -125,7 +125,7 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecoveryScreen())),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChronoScreen())),
               icon: const Icon(Icons.timer, size: 22),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0D9488),
@@ -133,7 +133,7 @@ class HomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              label: const Text('CHRONO RÉCUPÉRATION', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              label: const Text('CHRONO', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
@@ -166,33 +166,44 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class RecoveryScreen extends StatefulWidget {
-  const RecoveryScreen({Key? key}) : super(key: key);
+class ChronoScreen extends StatefulWidget {
+  const ChronoScreen({Key? key}) : super(key: key);
   @override
-  State<RecoveryScreen> createState() => _RecoveryScreenState();
+  State<ChronoScreen> createState() => _ChronoScreenState();
 }
 
-class _RecoveryScreenState extends State<RecoveryScreen> {
+class _ChronoScreenState extends State<ChronoScreen> {
+  final Stopwatch _stopwatch = Stopwatch();
   Timer? _timer;
-  int _dureeTotale = 90;
-  int _seconds = 90;
-  bool _isRunning = false;
 
-  void _startTimer(int seconds) {
+  void _startTimer() {
+    if (!_stopwatch.isRunning) {
+      _stopwatch.start();
+      _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+        setState(() {});
+      });
+    }
+  }
+
+  void _pauseTimer() {
+    if (_stopwatch.isRunning) {
+      _stopwatch.stop();
+      _timer?.cancel();
+      setState(() {});
+    }
+  }
+
+  void _stopTimer() {
+    _stopwatch.stop();
     _timer?.cancel();
-    setState(() {
-      _dureeTotale = seconds;
-      _seconds = seconds;
-      _isRunning = true;
-    });
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (_seconds > 0) {
-        setState(() => _seconds--);
-      } else {
-        _timer?.cancel();
-        setState(() => _isRunning = false);
-      }
-    });
+    setState(() {});
+  }
+
+  void _resetTimer() {
+    _stopwatch.stop();
+    _timer?.cancel();
+    _stopwatch.reset();
+    setState(() {});
   }
 
   @override
@@ -203,68 +214,88 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final duration = _stopwatch.elapsed;
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    final tenths = (duration.inMilliseconds.remainder(1000) ~/ 100);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Chrono Récupération'), backgroundColor: Colors.transparent),
+      appBar: AppBar(title: const Text('Chrono Gainage'), backgroundColor: Colors.transparent),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('${(_seconds ~/ 60).toString().padLeft(2, '0')}:${(_seconds % 60).toString().padLeft(2, '0')}',
-                style: const TextStyle(fontSize: 75, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-            const SizedBox(height: 30),
+            Text(
+              '$minutes:$seconds.$tenths',
+              style: const TextStyle(fontSize: 65, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+            ),
+            const SizedBox(height: 50),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildChoiceButton(90, '90s'),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _startTimer,
+                    icon: const Icon(Icons.play_arrow, color: Colors.white),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    label: const Text('Play', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
                 const SizedBox(width: 10),
-                _buildChoiceButton(180, '180s'),
-                const SizedBox(width: 10),
-                _buildChoiceButton(300, '300s'),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _pauseTimer,
+                    icon: const Icon(Icons.pause, color: Colors.white),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    label: const Text('Pause', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ElevatedButton(
-                  onPressed: _isRunning ? null : () => _startTimer(_dureeTotale),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
-                  child: Text('Lancer (${_dureeTotale}s)', style: const TextStyle(fontSize: 16)),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _stopTimer,
+                    icon: const Icon(Icons.stop, color: Colors.white),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    label: const Text('Stop', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
                 ),
-                const SizedBox(width: 15),
-                ElevatedButton(
-                  onPressed: () {
-                    _timer?.cancel();
-                    setState(() { _seconds = _dureeTotale; _isRunning = false; });
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
-                  child: const Text('Réinitialiser', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _resetTimer,
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4B5563),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    label: const Text('Reset', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
                 ),
               ],
-            )
+            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget b_btn(int sec, String label) => _buildChoiceButton(sec, label);
-
-  Widget _buildChoiceButton(int seconds, String label) {
-    bool isSelected = _dureeTotale == seconds;
-    return OutlinedButton(
-      onPressed: () {
-        setState(() {
-          _dureeTotale = seconds;
-          if (!_isRunning) _seconds = seconds;
-        });
-      },
-      style: OutlinedButton.styleFrom(
-        backgroundColor: isSelected ? const Color(0xFF10B981).withOpacity(0.2) : Colors.transparent,
-        side: BorderSide(color: isSelected ? const Color(0xFF10B981) : const Color(0xFF2D3748)),
-      ),
-      child: Text(label, style: TextStyle(color: isSelected ? const Color(0xFF10B981) : Colors.white)),
     );
   }
 }
@@ -486,165 +517,4 @@ class _SessionScreenState extends State<SessionScreen> {
                   child: TextField(
                     controller: series[i].repsCtrl,
                     decoration: const InputDecoration(labelText: 'Reps', isDense: true, border: OutlineInputBorder()),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
-                  onPressed: () => setState(() => series.removeAt(i)),
-                ),
-              ],
-            ),
-          )),
-          TextButton.icon(
-            onPressed: () => setState(() => series.add(SerieItem())),
-            icon: const Icon(Icons.add, color: Color(0xFF3B82F6)),
-            label: const Text('Ajouter une série', style: TextStyle(color: Color(0xFF3B82F6))),
-          ),
-          const SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: () async {
-              List<Map<String, String>> seriesData = series.map((s) => {
-                'poids': s.poidsCtrl.text.isEmpty ? '0' : s.poidsCtrl.text,
-                'reps': s.repsCtrl.text.isEmpty ? '0' : s.repsCtrl.text,
-              }).toList();
-
-              await DatabaseHelper.instance.ajouterSeance({
-                'date': DateTime.now().toString().substring(0, 16),
-                'exercice': exerciceActuel,
-                'series': seriesData,
-              });
-
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Séance enregistrée !')));
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('TERMINER LA SÉANCE', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          )
-        ],
-      ),
-    );
-  }
-}
-
-class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({Key? key}) : super(key: key);
-  @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
-}
-
-class _HistoryScreenState extends State<HistoryScreen> {
-  String filtreExercice = 'Tous les exercices';
-
-  @override
-  Widget build(BuildContext context) {
-    final List<String> optionsFiltre = [
-      'Tous les exercices',
-      ...DatabaseHelper.instance.exercicesDisponibles
-    ];
-
-    final toutesLesSessions = DatabaseHelper.instance.sessionsSauvegardees;
-    
-    final sessionsFiltreesAvecIndex = <MapEntry<int, Map<String, dynamic>>>[];
-    for (int i = 0; i < toutesLesSessions.length; i++) {
-      if (filtreExercice == 'Tous les exercices' || toutesLesSessions[i]['exercice'] == filtreExercice) {
-        sessionsFiltreesAvecIndex.add(MapEntry(i, toutesLesSessions[i]));
-      }
-    }
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Historique & Progression'), backgroundColor: Colors.transparent),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: const Color(0xFF161920),
-            child: DropdownButtonFormField<String>(
-              value: optionsFiltre.contains(filtreExercice) ? filtreExercice : 'Tous les exercices',
-              dropdownColor: const Color(0xFF1A1D24),
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'Filtrer par exercice',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-              items: optionsFiltre.map((String nom) {
-                return DropdownMenuItem<String>(
-                  value: nom,
-                  child: Text(nom),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                if (newValue != null) {
-                  setState(() => filtreExercice = newValue);
-                }
-              },
-            ),
-          ),
-          Expanded(
-            child: sessionsFiltreesAvecIndex.isEmpty
-                ? const Center(child: Text('Aucune séance enregistrée', style: TextStyle(color: Colors.grey)))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: sessionsFiltreesAvecIndex.length,
-                    itemBuilder: (context, index) {
-                      final itemReel = sessionsFiltreesAvecIndex[sessionsFiltreesAvecIndex.length - 1 - index];
-                      final int indexGlobal = itemReel.key;
-                      final s = itemReel.value;
-                      final List seriesList = s['series'] ?? [];
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A1D24),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF2D3748)),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(s['exercice'],
-                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
-                                  ),
-                                  Text(s['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                  const SizedBox(width: 8),
-                                  InkWell(
-                                    onTap: () async {
-                                      await DatabaseHelper.instance.supprimerSeance(indexGlobal);
-                                      setState(() {});
-                                    },
-                                    child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
-                                  ),
-                                ],
-                              ),
-                              const Divider(color: Color(0xFF2D3748), height: 20),
-                              ...List.generate(seriesList.length, (i) => Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: Text(
-                                  'Série ${i+1} : ${seriesList[i]['poids']} kg x ${seriesList[i]['reps']} reps',
-                                  style: const TextStyle(fontSize: 14, color: Colors.white70),
-                                ),
-                              )),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+                    keyboardTyp
