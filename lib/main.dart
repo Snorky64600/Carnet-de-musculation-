@@ -590,7 +590,10 @@ class ExerciseDetailScreen extends StatelessWidget {
         ],
       ),
     );
-  }class GestionExercicesScreen extends StatefulWidget {
+  }
+}
+
+class GestionExercicesScreen extends StatefulWidget {
   const GestionExercicesScreen({Key? key}) : super(key: key);
   @override
   State<GestionExercicesScreen> createState() => _GestionExercicesScreenState();
@@ -694,6 +697,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -996,7 +1000,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     itemCount: sessionsFiltreesAvecIndex.length,
                     itemBuilder: (context, index) {
                       final itemReel = sessionsFiltreesAvecIndex[sessionsFiltreesAvecIndex.length - 1 - index];
-                      final int indexGlobal = itemReel.key;
+            final int indexGlobal = itemReel.key;
                       final s = itemReel.value;
                       final List seriesList = s['series'] ?? [];
 
