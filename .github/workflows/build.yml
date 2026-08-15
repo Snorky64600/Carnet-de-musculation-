@@ -31,12 +31,12 @@ jobs:
           rm -rf clean_build/lib/main.dart
           cp -r lib/. clean_build/lib/
           cp pubspec.yaml clean_build/pubspec.yaml
-          
-          # 3. Injecter la clé de signature
-          cp android/app/upload-keystore.jks clean_build/android/app/upload-keystore.jks
           cp custom_build.gradle clean_build/android/app/build.gradle
           
-          # 4. Créer le fichier key.properties automatiquement à la volée
+          # 3. Générer la clé de signature directement depuis le secret GitHub
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > clean_build/android/app/upload-keystore.jks
+          
+          # 4. Créer le fichier key.properties automatiquement
           echo "storePassword=password" > clean_build/android/key.properties
           echo "keyPassword=password" >> clean_build/android/key.properties
           echo "keyAlias=upload" >> clean_build/android/key.properties
@@ -52,4 +52,3 @@ jobs:
         with:
           name: app-release
           path: clean_build/build/app/outputs/flutter-apk/app-release.apk
-          
