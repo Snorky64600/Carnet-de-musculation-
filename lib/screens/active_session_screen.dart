@@ -178,17 +178,11 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                         children: [
                           const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 20),
                           const SizedBox(width: 8),
-                          Text(
-                            'Step ${index + 1}',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
+                          Text('Step ${index + 1}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        widget.exercise.steps[index],
-                        style: const TextStyle(fontSize: 14, color: Colors.grey, height: 1.4),
-                      ),
+                      Text(widget.exercise.steps[index], style: const TextStyle(fontSize: 14, color: Colors.grey, height: 1.4)),
                     ],
                   ),
                 )),
@@ -239,10 +233,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                         child: ElevatedButton.icon(
                           onPressed: () => _startCentralRest(_dureeRecupChoisie),
                           icon: const Icon(Icons.timer, size: 18),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0D9488),
-                            foregroundColor: Colors.white,
-                          ),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D9488), foregroundColor: Colors.white),
                           label: Text('Lancer le repos (${_dureeRecupChoisie}s)'),
                         ),
                       ),
