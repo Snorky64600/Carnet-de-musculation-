@@ -25,13 +25,14 @@ jobs:
       - name: Build in clean isolated folder
         run: |
           flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation --platforms=android
-          rm -rf clean_build/lib/main.dart
-          cp -r lib/. clean_build/lib/
-          cp pubspec.yaml clean_build/pubspec.yaml
-          mkdir -p clean_build/assets
-          cp logo.png clean_build/assets/logo.png
-          cp upload-keystore.jks clean_build/android/app/upload-keystore.jks
-          cp key.properties clean_build/android/key.properties
+                rm -rf clean_build/lib/main.dart
+                cp -r lib/. clean_build/lib/
+                cp pubspec.yaml clean_build/pubspec.yaml
+                mkdir -p clean_build/assets
+                cp logo.png clean_build/assets/logo.png
+                cp upload-keystore.jks clean_build/android/app/upload-keystore.jks
+                cp key.properties clean_build/android/key.properties
+
           
           python3 -c "
           path = 'clean_build/android/app/build.gradle'
