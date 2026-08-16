@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../helpers/database_helper.dart';
 import '../widgets/media_widget.dart';
 import 'options_screen.dart';
 import 'chrono_screen.dart';
