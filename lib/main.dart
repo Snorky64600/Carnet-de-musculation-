@@ -542,7 +542,8 @@ class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderSt
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _stop, color: Colors.white),
+                        onPressed: _stopAndResetStopwatch,
+                        icon: const Icon(Icons.stop, color: Colors.white),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFEF4444),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -902,7 +903,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         ),
         body: TabBarView(
           children: [
-            // Page 1 : Images non rognées avec fondu et pavés séparés pour les instructions + Choix d'image
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -1000,7 +1000,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                 )),
               ],
             ),
-            // Page 2 : Saisie des séries, poids, répétitions et chronomètre
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
