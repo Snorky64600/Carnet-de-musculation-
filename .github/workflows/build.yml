@@ -50,9 +50,11 @@ jobs:
               f.write(content)
           "
           
-          cd clean_build
-          flutter pub get
-          flutter build apk --release
+                cd clean_build
+                flutter pub get
+                flutter pub run flutter_launcher_icons
+                flutter build apk --release
+
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
