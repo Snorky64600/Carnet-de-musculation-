@@ -8,6 +8,14 @@ import '../models/exercise_model.dart';
 import '../helpers/database_helper.dart';
 import '../widgets/media_widget.dart';
 
+// Définition de la classe SerieItem placée en haut pour éviter tout problème de portée
+class SerieItem {
+  final TextEditingController poidsCtrl = TextEditingController();
+  final TextEditingController repsCtrl = TextEditingController();
+  final TextEditingController rpeCtrl = TextEditingController();
+  bool isFailure = false;
+}
+
 class ActiveSessionScreen extends StatefulWidget {
   final ExerciseModel exercise;
   const ActiveSessionScreen({Key? key, required this.exercise}) : super(key: key);
@@ -43,14 +51,16 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     if (derniereSession != null && derniereSession['series'] != null) {
       final List seriesPassees = derniereSession['series'];
       setState(() {
-        series = seriesPassees.map((s) {
-          final item = SerieItem();
-          item.poidsCtrl.text = s['poids']?.toString() ?? '';
-          item.repsCtrl.text = s['reps']?.toString() ?? '';
-          item.rpeCtrl.text = s['rpe']?.toString() ?? '';
-          item.isFailure = s['echec'] == true || s['echec'] == 'true';
-          return item;
+        series = seriesPassees.map((item) {
+          final map = Map<String, dynamic>.from(item as Map);
+          final serieItem = SerieItem();
+          serieItem.poidsCtrl.text = map['poids']?.toString() ?? '';
+          serieItem.repsCtrl.text = map['reps']?.toString() ?? '';
+          serieItem.rpeCtrl.text = map['rpe']?.toString() ?? '';
+          serieItem.isFailure = map['echec'] == true || map['echec'] == 'true';
+          return serieItem;
         }).toList();
+
         if (series.isEmpty) {
           series = [SerieItem()];
         }
@@ -93,7 +103,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         final List seriesList = s['series'] ?? [];
         double maxPoidsSession = 0;
         for (var serie in seriesList) {
-          double p = double.tryParse(serie['poids'].toString()) ?? 0;
+          final mapSerie = Map<String, dynamic>.from(serie as Map);
+          double p = double.tryParse(mapSerie['poids'].toString()) ?? 0;
           if (p > maxPoidsSession) maxPoidsSession = p;
           if (p > maxPoidsGlobal) maxPoidsGlobal = p;
         }
@@ -217,7 +228,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
               ],
             ),
 
-            // ONGLET 2 : Saisir la Séance (avec Poids, Reps, RPE et Échec)
+            // ONGLET 2 : Saisir la Séance
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -436,147 +447,61 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                               child: LineChart(
                                 LineChartData(
                                   gridData: const FlGridData(show: false),
-                              titlesData: FlTitlesData(
-                                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                leftTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    reservedSize: 32,
-                                    getTitlesWidget: (value, meta) {
-                                      return Text('${value.toInt()}kg', style: const TextStyle(fontSize: 10, color: Colors.grey));
-                                    },
-                                  ),
-                                ),
-                                bottomTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    getTitlesWidget: (value, meta) {
-                                      int idx = value.toInt();
-                                      if (idx >= 0 && idx < datesLabels.length) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(top: 6.0),
-                                          child: Text(datesLabels[idx], style: const TextStyle(fontSize: 9, color: Colors.grey)),
-                                        );
-                                      }
-                                      return const Text('');
-                                    },
-                                  ),
-                                ),
-                              ),
-                              borderData: FlBorderData(show: false),
-                              lineBarsData: [
-                                LineChartBarData(
-                                  spots: spots,
-                                  isCurved: true,
-                                  color: const Color(0xFF3B82F6),
-                                  barWidth: 3,
-                                  isStrokeCapRound: true,
-                                  dotData: const FlDotData(show: true),
-                                  belowBarData: BarAreaData(
-                                    show: true,
-                                    color: const Color(0xFF3B82F6).withOpacity(0.15),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                ],
-              ),
-            ),
-          ],
-          Expanded(
-            child: sessionsFiltreesAvecIndex.isEmpty
-                ? const Center(child: Text('Aucune séance enregistrée pour cet exercice', style: TextStyle(color: Colors.grey)))
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: sessionsFiltreesAvecIndex.length,
-                    itemBuilder: (context, index) {
-                      final itemReel = sessionsFiltreesAvecIndex[sessionsFiltreesAvecIndex.length - 1 - index];
-                      final int indexGlobal = itemReel.key;
-                      final s = itemReel.value;
-                      final List seriesList = s['series'] ?? [];
-                      final String nomExoBrut = s['exercice'];
-                      final String nomExoNettoye = _nettoyerNom(nomExoBrut);
-
-                      double volumeTotalSeance = 0;
-                      for (var serie in seriesList) {
-                        double p = double.tryParse(serie['poids'].toString()) ?? 0;
-                        double r = double.tryParse(serie['reps'].toString()) ?? 0;
-                        volumeTotalSeance += (p * r);
-                      }
-
-                      return GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() {
-                            if (optionsFiltre.contains(nomExoNettoye)) {
-                              filtreExercice = nomExoNettoye;
-                            } else {
-                              filtreExercice = nomExoBrut;
-                            }
-                          });
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardColor,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF2D3748)),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(nomExoBrut,
-                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
+                                  titlesData: FlTitlesData(
+                                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    leftTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        reservedSize: 32,
+                                        getTitlesWidget: (value, meta) {
+                                          return Text('${value.toInt()}kg', style: const TextStyle(fontSize: 10, color: Colors.grey));
+                                        },
+                                      ),
                                     ),
-                                    Text(s['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                    const SizedBox(width: 8),
-                                    InkWell(
-                                      onTap: () async {
-                                        HapticFeedback.mediumImpact();
-                                        await DatabaseHelper.instance.supprimerSeance(indexGlobal);
-                                        setState(() {});
-                                      },
-                                      child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                                    bottomTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        getTitlesWidget: (value, meta) {
+                                          int idx = value.toInt();
+                                          if (idx >= 0 && idx < datesLabels.length) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(top: 6.0),
+                                              child: Text(datesLabels[idx], style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                                            );
+                                          }
+                                          return const Text('');
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  borderData: FlBorderData(show: false),
+                                  lineBarsData: [
+                                    LineChartBarData(
+                                      spots: spots,
+                                      isCurved: true,
+                                      color: const Color(0xFF3B82F6),
+                                      barWidth: 3,
+                                      isStrokeCapRound: true,
+                                      dotData: const FlDotData(show: true),
+                                      belowBarData: BarAreaData(
+                                        show: true,
+                                        color: const Color(0xFF3B82F6).withOpacity(0.15),
+                                      ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text('Volume total : ${volumeTotalSeance.toStringAsFixed(0)} kg',
-                                    style: const TextStyle(fontSize: 13, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
-                                const Divider(color: Color(0xFF2D3748), height: 16),
-                                ...List.generate(seriesList.length, (i) {
-                                  final serie = seriesList[i];
-                                  final rpe = serie['rpe']?.toString() ?? '';
-                                  final isEchec = serie['echec'] == true || serie['echec'] == 'true';
-                                  
-                                  String details = 'Série ${i+1} : ${serie['poids']} kg x ${serie['reps']} reps';
-                                  if (rpe.isNotEmpty) details += ' (RPE $rpe)';
-                                  if (isEchec) details += ' 💥 Échec';
-
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
-                                    child: Text(details, style: const TextStyle(fontSize: 14)),
-                                  );
-                                }),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                      );
-                    },
+                    ],
                   ),
-          ),
-        ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
+     
