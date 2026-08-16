@@ -372,7 +372,7 @@ class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderSt
           labelColor: const Color(0xFF10B981),
           unselectedLabelColor: Colors.grey,
           tabs: const [
-            Tab(text: 'Chronomètre (Gainage)'),
+            Tab(text: 'Chronomètre'),
             Tab(text: 'Minuteur de Repos'),
           ],
         ),
@@ -700,7 +700,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                             margin: const EdgeInsets.only(right: 8),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: buildMediaWidget(imagesList[index]),
+                              child: buildMediaWidget(imagesList[index], fit: BoxFit.contain),
                             ),
                           ),
                           Positioned(
@@ -846,7 +846,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                       child: SizedBox(
                         width: 50,
                         height: 50,
-                        child: buildMediaWidget(exercise.images.first),
+                        child: buildMediaWidget(exercise.images.first, fit: BoxFit.contain),
                       ),
                     ),
                     title: Text(exercise.nom, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
