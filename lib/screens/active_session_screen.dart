@@ -47,6 +47,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
           final item = SerieItem();
           item.poidsCtrl.text = s['poids']?.toString() ?? '';
           item.repsCtrl.text = s['reps']?.toString() ?? '';
+          item.rpeCtrl.text = s['rpe']?.toString() ?? '';
+          item.isFailure = s['echec'] == true || s['echec'] == 'true';
           return item;
         }).toList();
         if (series.isEmpty) {
@@ -80,7 +82,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // --- Calcul des données de progression pour cet exercice précis ---
     final toutesLesSessions = DatabaseHelper.instance.sessionsSauvegardees;
     double maxPoidsGlobal = 0;
     List<FlSpot> spots = [];
@@ -103,7 +104,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     }
 
     return DefaultTabController(
-      length: 3, // 3 onglets désormais
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.exercise.nom),
@@ -122,7 +123,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         ),
         body: TabBarView(
           children: [
-            // --- ONGLET 1 : Description & Photos ---
+            // ONGLET 1 : Description
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -216,7 +217,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
               ],
             ),
 
-            // --- ONGLET 2 : Saisir la Séance ---
+            // ONGLET 2 : Saisir la Séance (avec Poids, Reps, RPE et Échec)
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -304,31 +305,60 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFF2D3748)),
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      Text('S${i+1}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: series[i].poidsCtrl,
-                          decoration: const InputDecoration(labelText: 'Poids (kg)', isDense: true, border: OutlineInputBorder()),
-                          keyboardType: TextInputType.number,
-                        ),
+                      Row(
+                        children: [
+                          Text('S${i+1}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: series[i].poidsCtrl,
+                              decoration: const InputDecoration(labelText: 'Poids', isDense: true, border: OutlineInputBorder()),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: series[i].repsCtrl,
+                              decoration: const InputDecoration(labelText: 'Reps', isDense: true, border: OutlineInputBorder()),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 60,
+                            child: TextField(
+                              controller: series[i].rpeCtrl,
+                              decoration: const InputDecoration(labelText: 'RPE', isDense: true, border: OutlineInputBorder()),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              setState(() => series.removeAt(i));
+                            },
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: series[i].repsCtrl,
-                          decoration: const InputDecoration(labelText: 'Reps', isDense: true, border: OutlineInputBorder()),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          setState(() => series.removeAt(i));
-                        },
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          FilterChip(
+                            label: const Text('Échec', style: TextStyle(fontSize: 12)),
+                            selected: series[i].isFailure,
+                            selectedColor: Colors.red.withOpacity(0.3),
+                            checkmarkColor: Colors.red,
+                            onSelected: (val) {
+                              HapticFeedback.selectionClick();
+                              setState(() => series[i].isFailure = val);
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -345,9 +375,11 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     HapticFeedback.heavyImpact();
-                    List<Map<String, String>> seriesData = series.map((s) => {
+                    List<Map<String, dynamic>> seriesData = series.map((s) => {
                       'poids': s.poidsCtrl.text.isEmpty ? '0' : s.poidsCtrl.text,
                       'reps': s.repsCtrl.text.isEmpty ? '0' : s.repsCtrl.text,
+                      'rpe': s.rpeCtrl.text,
+                      'echec': s.isFailure,
                     }).toList();
 
                     await DatabaseHelper.instance.ajouterSeance({
@@ -370,7 +402,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
               ],
             ),
 
-            // --- ONGLET 3 : Progression de l'exercice en direct ---
+            // ONGLET 3 : Progression
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -404,66 +436,147 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                               child: LineChart(
                                 LineChartData(
                                   gridData: const FlGridData(show: false),
-                                  titlesData: FlTitlesData(
-                                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                    leftTitles: AxisTitles(
-                                      sideTitles: SideTitles(
-                                        showTitles: true,
-                                        reservedSize: 32,
-                                        getTitlesWidget: (value, meta) {
-                                          return Text('${value.toInt()}kg', style: const TextStyle(fontSize: 10, color: Colors.grey));
-                                        },
-                                      ),
-                                    ),
-                                    bottomTitles: AxisTitles(
-                                      sideTitles: SideTitles(
-                                        showTitles: true,
-                                        getTitlesWidget: (value, meta) {
-                                          int idx = value.toInt();
-                                          if (idx >= 0 && idx < datesLabels.length) {
-                                            return Padding(
-                                              padding: const EdgeInsets.only(top: 6.0),
-                                              child: Text(datesLabels[idx], style: const TextStyle(fontSize: 9, color: Colors.grey)),
-                                            );
-                                          }
-                                          return const Text('');
-                                        },
-                                      ),
-                                    ),
+                              titlesData: FlTitlesData(
+                                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                leftTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    reservedSize: 32,
+                                    getTitlesWidget: (value, meta) {
+                                      return Text('${value.toInt()}kg', style: const TextStyle(fontSize: 10, color: Colors.grey));
+                                    },
                                   ),
-                                  borderData: FlBorderData(show: false),
-                                  lineBarsData: [
-                                    LineChartBarData(
-                                      spots: spots,
-                                      isCurved: true,
-                                      color: const Color(0xFF3B82F6),
-                                      barWidth: 3,
-                                      isStrokeCapRound: true,
-                                      dotData: const FlDotData(show: true),
-                                      belowBarData: BarAreaData(
-                                        show: true,
-                                        color: const Color(0xFF3B82F6).withOpacity(0.15),
-                                      ),
+                                ),
+                                bottomTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    getTitlesWidget: (value, meta) {
+                                      int idx = value.toInt();
+                                      if (idx >= 0 && idx < datesLabels.length) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(top: 6.0),
+                                          child: Text(datesLabels[idx], style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                                        );
+                                      }
+                                      return const Text('');
+                                    },
+                                  ),
+                                ),
+                              ),
+                              borderData: FlBorderData(show: false),
+                              lineBarsData: [
+                                LineChartBarData(
+                                  spots: spots,
+                                  isCurved: true,
+                                  color: const Color(0xFF3B82F6),
+                                  barWidth: 3,
+                                  isStrokeCapRound: true,
+                                  dotData: const FlDotData(show: true),
+                                  belowBarData: BarAreaData(
+                                    show: true,
+                                    color: const Color(0xFF3B82F6).withOpacity(0.15),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                ],
+              ),
+            ),
+          ],
+          Expanded(
+            child: sessionsFiltreesAvecIndex.isEmpty
+                ? const Center(child: Text('Aucune séance enregistrée pour cet exercice', style: TextStyle(color: Colors.grey)))
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: sessionsFiltreesAvecIndex.length,
+                    itemBuilder: (context, index) {
+                      final itemReel = sessionsFiltreesAvecIndex[sessionsFiltreesAvecIndex.length - 1 - index];
+                      final int indexGlobal = itemReel.key;
+                      final s = itemReel.value;
+                      final List seriesList = s['series'] ?? [];
+                      final String nomExoBrut = s['exercice'];
+                      final String nomExoNettoye = _nettoyerNom(nomExoBrut);
+
+                      double volumeTotalSeance = 0;
+                      for (var serie in seriesList) {
+                        double p = double.tryParse(serie['poids'].toString()) ?? 0;
+                        double r = double.tryParse(serie['reps'].toString()) ?? 0;
+                        volumeTotalSeance += (p * r);
+                      }
+
+                      return GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            if (optionsFiltre.contains(nomExoNettoye)) {
+                              filtreExercice = nomExoNettoye;
+                            } else {
+                              filtreExercice = nomExoBrut;
+                            }
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF2D3748)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(nomExoBrut,
+                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
+                                    ),
+                                    Text(s['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                    const SizedBox(width: 8),
+                                    InkWell(
+                                      onTap: () async {
+                                        HapticFeedback.mediumImpact();
+                                        await DatabaseHelper.instance.supprimerSeance(indexGlobal);
+                                        setState(() {});
+                                      },
+                                      child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
                                     ),
                                   ],
                                 ),
-                              ),
+                                const SizedBox(height: 4),
+                                Text('Volume total : ${volumeTotalSeance.toStringAsFixed(0)} kg',
+                                    style: const TextStyle(fontSize: 13, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
+                                const Divider(color: Color(0xFF2D3748), height: 16),
+                                ...List.generate(seriesList.length, (i) {
+                                  final serie = seriesList[i];
+                                  final rpe = serie['rpe']?.toString() ?? '';
+                                  final isEchec = serie['echec'] == true || serie['echec'] == 'true';
+                                  
+                                  String details = 'Série ${i+1} : ${serie['poids']} kg x ${serie['reps']} reps';
+                                  if (rpe.isNotEmpty) details += ' (RPE $rpe)';
+                                  if (isEchec) details += ' 💥 Échec';
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Text(details, style: const TextStyle(fontSize: 14)),
+                                  );
+                                }),
+                              ],
                             ),
-                    ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
-
-class SerieItem {
-  final TextEditingController poidsCtrl = TextEditingController();
-  final TextEditingController repsCtrl.text = TextEditingController(); // Wait, let's keep clean: repsCtrl
-}
-                
