@@ -789,20 +789,6 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bibliothèque d\'exercices'),
-        backgroundColor: Colors.transparent,
-        actions: [
-          IconButton(
-            icon: Icon(_triAlphabetique ? Icons.sort_by_alpha : Icons.list, color: Colors.white),
-            tooltip: 'Trier',
-            onPressed: () => setState(() => _triAlphabetique = !_triAlphabetique),
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          // Barre de filtrage par mot-clé (tag)
 class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
   final ImagePicker _picker = ImagePicker();
   String _filtreTag = 'Tous';
