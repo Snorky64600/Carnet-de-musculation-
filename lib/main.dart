@@ -1229,33 +1229,92 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
                                   ),
                                   Text(s['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                  const SizedBox(width: 8),
-                                  InkWell(
-                                    onTap: () async {
-                                      await DatabaseHelper.instance.supprimerSeance(indexGlobal);
-                                      setState(() {});
-                                    },
-                                    child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
-                                  ),
-                                ],
-                              ),
-                              const Divider(color: Color(0xFF2D3748), height: 20),
-                              ...List.generate(seriesList.length, (i) => Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: Text(
-                                  'Série ${i+1} : ${seriesList[i]['poids']} kg x ${seriesList[i]['reps']} reps',
-                                  style: const TextStyle(fontSize: 14, color: Colors.white70),
-                                ),
-                              )),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+class HistoryScreen extends StatefulWidget {
+  const HistoryScreen({Key? key}) : super(key: key);
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  String filtreExercice = 'Tous les exercices';
+
+  @override
+  Widget build(BuildContext context) {
+    final List<String> optionsFiltre = [
+      'Tous les exercices',
+      ...DatabaseHelper.instance.exercicesDisponibles.map((e) => e.nom)
+    ];
+
+    final toutesLesSessions = DatabaseHelper.instance.sessionsSauvegardees;
+    final sessionsFiltreesAvecIndex = <MapEntry<int, Map<String, dynamic>>>[];
+    
+    for (int i = 0; i < toutesLesSessions.length; i++) {
+      if (filtreExercice == 'Tous les exercices' || 
+          toutesLesSessions[i]['exercice'] == filtreExercice || 
+          toutesLesSessions[i]['exercice'] == '$filtreExercice (par côté)') {
+        sessionsFiltreesAvecIndex.add(MapEntry(i, toutesLesSessions[i]));
+      }
+    }
+
+    double maxPoidsGlobal = 0;
+    List<Map<String, dynamic>> dataGraphique = [];
+    
+    if (filtreExercice != 'Tous les exercices') {
+      for (var item in sessionsFiltreesAvecIndex.reversed) {
+        final s = item.value;
+        final List seriesList = s['series'] ?? [];
+        double maxPoidsSession = 0;
+        for (var serie in seriesList) {
+          double p = double.tryParse(serie['poids'].toString()) ?? 0;
+          if (p > maxPoidsSession) maxPoidsSession = p;
+          if (p > maxPoidsGlobal) maxPoidsGlobal = p;
+        }
+        dataGraphique.add({'date': s['date'].toString().substring(5, 10), 'poids': maxPoidsSession});
+      }
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Historique & Progression'), backgroundColor: Colors.transparent),
+      body: Column(children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: DropdownButtonFormField<String>(
+            value: optionsFiltre.contains(filtreExercice) ? filtreExercice : 'Tous les exercices',
+            dropdownColor: const Color(0xFF1A1D24),
+            isExpanded: true,
+            decoration: InputDecoration(labelText: 'Filtrer par exercice', border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+            items: optionsFiltre.map((String nom) => DropdownMenuItem<String>(value: nom, child: Text(nom))).toList(),
+            onChanged: (String? newValue) => setState(() => filtreExercice = newValue!),
+          ),
+        ),
+        if (filtreExercice != 'Tous les exercices') ...[
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFF1A1D24), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF2D3748))),
+            child: Column(children: [
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                const Text('Record Personnel (Max)', style: TextStyle(color: Colors.grey)),
+                Text('${maxPoidsGlobal.toStringAsFixed(1)} kg', style: const TextStyle(color: Color(0xFF10B981), fontSize: 20, fontWeight: FontWeight.bold)),
+              ]),
+              const SizedBox(height: 16),
+              SizedBox(height: 120, child: Row(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.spaceAround, children: dataGraphique.map((d) {
+                double poids = d['poids'];
+                double hauteur = maxPoidsGlobal > 0 ? (poids / maxPoidsGlobal) * 85 : 10;
+                return Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  Text('${poids.toInt()}kg', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                  Container(width: 26, height: hauteur < 10 ? 10 : hauteur, decoration: BoxDecoration(color: const Color(0xFF3B82F6), borderRadius: BorderRadius.circular(6))),
+                  Text(d['date'], style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                ]);
+              }).toList())),
+            ]),
           ),
         ],
-      ),
+        Expanded(child: ListView.builder(itemCount: sessionsFiltreesAvecIndex.length, itemBuilder: (context, index) {
+          final item = sessionsFiltreesAvecIndex[sessionsFiltreesAvecIndex.length - 1 - index];
+          return ListTile(title: Text(item.value['exercice']), subtitle: Text(item.value['date']), trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () async { await DatabaseHelper.instance.supprimerSeance(item.key); setState(() {}); }));
+        })),
+      ]),
     );
   }
 }
