@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../models/exercise_model.dart';
 import '../helpers/database_helper.dart';
 import '../widgets/media_widget.dart';
@@ -78,24 +79,50 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // --- Calcul des données de progression pour cet exercice précis ---
+    final toutesLesSessions = DatabaseHelper.instance.sessionsSauvegardees;
+    double maxPoidsGlobal = 0;
+    List<FlSpot> spots = [];
+    List<String> datesLabels = [];
+    int indexCoord = 0;
+
+    for (var s in toutesLesSessions.reversed) {
+      if (s['exercice'] == widget.exercise.nom || s['exercice'] == '${widget.exercise.nom} (par côté)') {
+        final List seriesList = s['series'] ?? [];
+        double maxPoidsSession = 0;
+        for (var serie in seriesList) {
+          double p = double.tryParse(serie['poids'].toString()) ?? 0;
+          if (p > maxPoidsSession) maxPoidsSession = p;
+          if (p > maxPoidsGlobal) maxPoidsGlobal = p;
+        }
+        spots.add(FlSpot(indexCoord.toDouble(), maxPoidsSession));
+        datesLabels.add(s['date'].toString().substring(5, 10));
+        indexCoord++;
+      }
+    }
+
     return DefaultTabController(
-      length: 2,
+      length: 3, // 3 onglets désormais
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.exercise.nom),
           backgroundColor: Colors.transparent,
           bottom: const TabBar(
+            isScrollable: true,
             indicatorColor: Color(0xFF3B82F6),
             labelColor: Color(0xFF3B82F6),
             unselectedLabelColor: Colors.grey,
             tabs: [
-              Tab(text: 'Description & Photos', icon: Icon(Icons.info_outline)),
+              Tab(text: 'Description', icon: Icon(Icons.info_outline)),
               Tab(text: 'Saisir la Séance', icon: Icon(Icons.fitness_center)),
+              Tab(text: 'Progression', icon: Icon(Icons.show_chart)),
             ],
           ),
         ),
         body: TabBarView(
           children: [
+            // --- ONGLET 1 : Description & Photos ---
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -188,6 +215,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                 )),
               ],
             ),
+
+            // --- ONGLET 2 : Saisir la Séance ---
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -340,6 +369,92 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                 )
               ],
             ),
+
+            // --- ONGLET 3 : Progression de l'exercice en direct ---
+            ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2D3748)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Record Personnel (Max)', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                          Text('${maxPoidsGlobal.toStringAsFixed(1)} kg', style: const TextStyle(color: Color(0xFF10B981), fontSize: 20, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Évolution historique', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      spots.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 30),
+                              child: Center(child: Text('Pas encore de données pour cet exercice', style: TextStyle(color: Colors.grey, fontSize: 13))),
+                            )
+                          : SizedBox(
+                              height: 200,
+                              child: LineChart(
+                                LineChartData(
+                                  gridData: const FlGridData(show: false),
+                                  titlesData: FlTitlesData(
+                                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    leftTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        reservedSize: 32,
+                                        getTitlesWidget: (value, meta) {
+                                          return Text('${value.toInt()}kg', style: const TextStyle(fontSize: 10, color: Colors.grey));
+                                        },
+                                      ),
+                                    ),
+                                    bottomTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        getTitlesWidget: (value, meta) {
+                                          int idx = value.toInt();
+                                          if (idx >= 0 && idx < datesLabels.length) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(top: 6.0),
+                                              child: Text(datesLabels[idx], style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                                            );
+                                          }
+                                          return const Text('');
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  borderData: FlBorderData(show: false),
+                                  lineBarsData: [
+                                    LineChartBarData(
+                                      spots: spots,
+                                      isCurved: true,
+                                      color: const Color(0xFF3B82F6),
+                                      barWidth: 3,
+                                      isStrokeCapRound: true,
+                                      dotData: const FlDotData(show: true),
+                                      belowBarData: BarAreaData(
+                                        show: true,
+                                        color: const Color(0xFF3B82F6).withOpacity(0.15),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -349,5 +464,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
 
 class SerieItem {
   final TextEditingController poidsCtrl = TextEditingController();
-  final TextEditingController repsCtrl = TextEditingController();
+  final TextEditingController repsCtrl.text = TextEditingController(); // Wait, let's keep clean: repsCtrl
 }
+                
