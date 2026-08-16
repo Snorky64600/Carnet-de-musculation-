@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../main.dart'; // Import pour themeNotifier
+import '../main.dart';
 
 class OptionsScreen extends StatefulWidget {
   const OptionsScreen({Key? key}) : super(key: key);
@@ -47,6 +47,38 @@ class _OptionsScreenState extends State<OptionsScreen> {
               themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
               final prefs = await SharedPreferences.getInstance();
               prefs.setBool('is_dark_theme', val);
+            },
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.0),
+            child: Text('Lien du projet GitHub', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          TextField(
+            controller: _githubController,
+            decoration: const InputDecoration(
+              hintText: 'https://github.com/ton-projet',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: _saveGithubLink,
+          ),
+          const Divider(height: 30),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('À propos'),
+            subtitle: const Text('Version 1.4.0 • Carnet de Musculation'),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              showAboutDialog(
+                context: context,
+                applicationName: 'Carnet de Musculation',
+                applicationVersion: '1.4.0',
+                applicationLegalese: 'Développé pour un suivi d\'entraînement intensif.',
+                children: const [
+                  SizedBox(height: 10),
+                  Text('Application complète de suivi de séances, gestion d\'exercices et chronométrage.'),
+                ],
+              );
             },
           ),
         ],
