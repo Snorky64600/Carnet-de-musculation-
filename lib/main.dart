@@ -7,8 +7,6 @@ ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DatabaseHelper.instance.chargerDonnees();
-  // Pour le thème, on charge via SharedPrefs ici ou on le passe dans DatabaseHelper
-  // Pour simplifier, on garde juste le ValueNotifier actif pour l'instant
   runApp(const CarnetMusculationApp());
 }
 
