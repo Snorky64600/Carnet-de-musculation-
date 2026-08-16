@@ -803,76 +803,91 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
       body: Column(
         children: [
           // Barre de filtrage par mot-clé (tag)
-          Container(
-            height: 55,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: tousLesTags.map((tag) {
-                bool isSelected = _filtreTag == tag;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(tag),
-                    selected: isSelected,
-                    selectedColor: const Color(0xFF3B82F6),
-                    backgroundColor: const Color(0xFF1A1D24),
-                    labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.grey),
-                    onSelected: (selected) {
-                      setState(() => _filtreTag = tag);
+class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
+  final ImagePicker _picker = ImagePicker();
+  String _filtreTag = 'Tous';
+  bool _triAlphabetique = true;
+
+  void _ouvrirDialogEdition({ExerciseModel? exerciceExistant}) {
+    final nomCtrl = TextEditingController(text: exerciceExistant?.nom ?? '');
+    final tagsCtrl = TextEditingController(text: exerciceExistant?.tags.join(', ') ?? 'Musculation');
+    final stepsCtrl = TextEditingController(text: exerciceExistant?.steps.join('\n') ?? 'Étape 1 : Réaliser le mouvement.');
+    List<String> imagesList = List.from(exerciceExistant?.images ?? ['https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600']);
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1D24),
+          title: Text(exerciceExistant == null ? 'Nouvel exercice' : 'Modifier l\'exercice'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nomCtrl, decoration: const InputDecoration(labelText: 'Nom', labelStyle: TextStyle(color: Colors.grey))),
+                const SizedBox(height: 14),
+                const Align(alignment: Alignment.centerLeft, child: Text('Photos / Animations :', style: TextStyle(color: Colors.grey, fontSize: 13))),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 70,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: imagesList.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == imagesList.length) {
+                        return Container(width: 70, decoration: BoxDecoration(color: const Color(0xFF2D3748), borderRadius: BorderRadius.circular(8)), child: IconButton(icon: const Icon(Icons.add_a_photo), onPressed: () async { final XFile? img = await _picker.pickImage(source: ImageSource.gallery); if (img != null) setStateDialog(() => imagesList.add(img.path)); }));
+                      }
+                      return Stack(children: [
+                        GestureDetector(
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FullScreenImageScreen(imagePath: imagesList[index]))),
+                          child: Container(width: 70, margin: const EdgeInsets.only(right: 8), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: buildMediaWidget(imagesList[index], fit: BoxFit.contain))),
+                        ),
+                        Positioned(right: 8, top: 0, child: GestureDetector(onTap: () => setStateDialog(() => imagesList.removeAt(index)), child: const Icon(Icons.close, size: 16, color: Colors.red)))
+                      ]);
                     },
                   ),
-                );
-              }).toList(),
+                ),
+                TextField(controller: tagsCtrl, decoration: const InputDecoration(labelText: 'Tags (séparés par virgules)')),
+                TextField(controller: stepsCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Étapes (une par ligne)')),
+              ],
             ),
           ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: exercicesAffiches.length,
-              itemBuilder: (context, index) {
-                final exercise = exercicesAffiches[index];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1D24),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF2D3748)),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: SizedBox(
-                        width: 50,
-                        height: 50,
-                        child: buildMediaWidget(exercise.images.first, fit: BoxFit.contain),
-                      ),
-                    ),
-                    title: Text(exercise.nom, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white)),
-                    subtitle: Text(exercise.tags.join(' • '), style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => ExerciseDetailScreen(exercise: exercise)),
-                      );
-                    },
-                    trailing: IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.grey, size: 20),
-                      onPressed: () => _ouvrirDialogEdition(exerciceExistant: exercise),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+            ElevatedButton(onPressed: () async {
+              final model = ExerciseModel(nom: nomCtrl.text.trim(), images: imagesList, tags: tagsCtrl.text.split(',').map((t) => t.trim()).toList(), steps: stepsCtrl.text.split('\n').map((s) => s.trim()).toList());
+              if (exerciceExistant == null) await DatabaseHelper.instance.ajouterExerciceComplet(model);
+              else await DatabaseHelper.instance.modifierExerciceComplet(exerciceExistant.nom, model);
+              Navigator.pop(context);
+              setState(() {});
+            }, child: const Text('Enregistrer')),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF3B82F6),
-        onPressed: () => _ouvrirDialogEdition(),
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Set<String> tousLesTags = {'Tous', ...DatabaseHelper.instance.exercicesDisponibles.expand((e) => e.tags)};
+    List<ExerciseModel> exercicesAffiches = DatabaseHelper.instance.exercicesDisponibles.where((exo) => _filtreTag == 'Tous' || exo.tags.contains(_filtreTag)).toList();
+    if (_triAlphabetique) exercicesAffiches.sort((a, b) => a.nom.compareTo(b.nom));
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Bibliothèque'), actions: [IconButton(icon: Icon(_triAlphabetique ? Icons.sort_by_alpha : Icons.list), onPressed: () => setState(() => _triAlphabetique = !_triAlphabetique))]),
+      body: Column(children: [
+        SizedBox(height: 55, child: ListView(scrollDirection: Axis.horizontal, children: tousLesTags.map((tag) => Padding(padding: const EdgeInsets.all(8), child: ChoiceChip(label: Text(tag), selected: _filtreTag == tag, onSelected: (s) => setState(() => _filtreTag = tag)))).toList())),
+        Expanded(child: ListView.builder(itemCount: exercicesAffiches.length, itemBuilder: (context, index) {
+          final exercise = exercicesAffiches[index];
+          return Container(margin: const EdgeInsets.only(bottom: 12, left: 16, right: 16), decoration: BoxDecoration(color: const Color(0xFF1A1D24), borderRadius: BorderRadius.circular(12)), child: ListTile(
+            leading: SizedBox(width: 50, height: 50, child: buildMediaWidget(exercise.images.first, fit: BoxFit.contain)),
+            title: Text(exercise.nom),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExerciseDetailScreen(exercise: exercise))),
+            trailing: IconButton(icon: const Icon(Icons.edit), onPressed: () => _ouvrirDialogEdition(exerciceExistant: exercise)),
+          ));
+        }))
+      ]),
+      floatingActionButton: FloatingActionButton(onPressed: () => _ouvrirDialogEdition(), child: const Icon(Icons.add)),
     );
   }
 }
