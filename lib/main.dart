@@ -753,42 +753,12 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                     steps: nouvellesSteps.isNotEmpty ? nouvellesSteps : ['Étape 1 : Réaliser le mouvement.'],
                   );
 
-                  if (exerciceExistant == null) {
-                    await DatabaseHelper.instance.ajouterExerciceComplet(model);
-                  } else {
-                    await DatabaseHelper.instance.modifierExerciceComplet(exerciceExistant.nom, model);
-                  }
-                  Navigator.pop(context);
-                  setState(() {});
-                }
-              },
-              child: Text(exerciceExistant == null ? 'Ajouter' : 'Enregistrer'),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
+class GestionExercicesScreen extends StatefulWidget {
+  const GestionExercicesScreen({Key? key}) : super(key: key);
   @override
-  Widget build(BuildContext context) {
-    // Récupérer tous les tags uniques pour le filtre
-    Set<String> tousLesTags = {'Tous'};
-    for (var exo in DatabaseHelper.instance.exercicesDisponibles) {
-      tousLesTags.addAll(exo.tags);
-    }
+  State<GestionExercicesScreen> createState() => _GestionExercicesScreenState();
+}
 
-    // Filtrer et trier la liste
-    List<ExerciseModel> exercicesAffiches = DatabaseHelper.instance.exercicesDisponibles.where((exo) {
-      if (_filtreTag == 'Tous') return true;
-      return exo.tags.contains(_filtreTag);
-    }).toList();
-
-    if (_triAlphabetique) {
-      exercicesAffiches.sort((a, b) => a.nom.compareTo(b.nom));
-    }
-
-    return Scaffold(
 class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
   final ImagePicker _picker = ImagePicker();
   String _filtreTag = 'Tous';
