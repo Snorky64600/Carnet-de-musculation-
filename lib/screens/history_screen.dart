@@ -12,7 +12,6 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   String filtreExercice = 'Tous les exercices';
 
-  // Nettoie le nom de l'exercice au cas où il y a "(par côté)"
   String _nettoyerNom(String nomExercice) {
     return nomExercice.replaceAll(' (par côté)', '').trim();
   }
@@ -188,7 +187,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         onTap: () {
                           HapticFeedback.selectionClick();
                           setState(() {
-                            // Si l'exercice existe dans les options, on filtre dessus au clic
                             if (optionsFiltre.contains(nomExoNettoye)) {
                               filtreExercice = nomExoNettoye;
                             } else {
@@ -231,13 +229,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 Text('Volume total : ${volumeTotalSeance.toStringAsFixed(0)} kg',
                                     style: const TextStyle(fontSize: 13, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
                                 const Divider(color: Color(0xFF2D3748), height: 16),
-                                ...List.generate(seriesList.length, (i) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Text(
-                                    'Série ${i+1} : ${seriesList[i]['poids']} kg x ${seriesList[i]['reps']} reps',
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                )),
+                                ...List.generate(seriesList.length, (i) {
+                                  final serie = seriesList[i];
+                                  final rpe = serie['rpe']?.toString() ?? '';
+                                  final isEchec = serie['echec'] == true || serie['echec'] == 'true';
+                                  
+                                  String details = 'Série ${i+1} : ${serie['poids']} kg x ${serie['reps']} reps';
+                                  if (rpe.isNotEmpty) details += ' (RPE $rpe)';
+                                  if (isEchec) details += ' 💥 Échec';
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Text(details, style: const TextStyle(fontSize: 14)),
+                                  );
+                                }),
                               ],
                             ),
                           ),
