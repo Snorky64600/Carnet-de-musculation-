@@ -5,15 +5,21 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 
+// Notifier global pour le changement de thème dynamique
+ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DatabaseHelper.instance.chargerDonnees();
+  final prefs = await SharedPreferences.getInstance();
+  bool isDark = prefs.getBool('is_dark_theme') ?? true;
+  themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
   runApp(const CarnetMusculationApp());
 }
 
 class ExerciseModel {
   String nom;
-  List<String> images; // Supporte plusieurs images / animations / vidéos courtes
+  List<String> images;
   List<String> tags;
   List<String> steps;
 
@@ -168,18 +174,34 @@ class CarnetMusculationApp extends StatelessWidget {
   const CarnetMusculationApp({Key? key}) : super(key: key);
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0F1115),
-        cardColor: const Color(0xFF1A1D24),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF3B82F6),
-          secondary: Color(0xFF10B981),
-          surface: Color(0xFF1A1D24),
-        ),
-      ),
-      home: const HomeScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, Mode, __) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          themeMode: Mode,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            scaffoldBackgroundColor: const Color(0xFFF4F6F9),
+            cardColor: Colors.white,
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF2563EB),
+              secondary: Color(0xFF10B981),
+              surface: Colors.white,
+            ),
+          ),
+          darkTheme: ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: const Color(0xFF0F1115),
+            cardColor: const Color(0xFF1A1D24),
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF3B82F6),
+              secondary: Color(0xFF10B981),
+              surface: Color(0xFF1A1D24),
+            ),
+          ),
+          home: const HomeScreen(),
+        );
+      },
     );
   }
 }
@@ -188,12 +210,19 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({Key? key}) : super(key: key);
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Carnet de Musculation', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OptionsScreen())),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -202,7 +231,7 @@ class HomeScreen extends StatelessWidget {
           children: [
             const SizedBox(height: 10),
             ElevatedButton.icon(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SessionScreen())),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SelectExerciseForSessionScreen())),
               icon: const Icon(Icons.fitness_center, size: 22),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB),
@@ -227,10 +256,9 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GestionExercicesScreen())),
-              icon: const Icon(Icons.settings, size: 22, color: Colors.grey),
+              icon: const Icon(Icons.settings, size: 22),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Color(0xFF2D3748)),
+                side: BorderSide(color: isDark ? const Color(0xFF2D3748) : Colors.grey.shade300),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -239,32 +267,41 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen())),
-              icon: const Icon(Icons.history, size: 22, color: Colors.grey),
+              icon: const Icon(Icons.history, size: 22),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Color(0xFF2D3748)),
+                side: BorderSide(color: isDark ? const Color(0xFF2D3748) : Colors.grey.shade300),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               label: const Text('Historique & Progression', style: TextStyle(fontSize: 15)),
             ),
             const SizedBox(height: 20),
-            // Zone d'illustration / Image animée dans la zone rouge
+            // Zone d'illustration fondue dans le thème
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF2D3748)),
+                  border: Border.all(color: isDark ? const Color(0xFF2D3748) : Colors.grey.shade300),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Image.network(
-                    // Remplace ce lien par ton URL d'image fixe ou de GIF animé (.gif)
-                    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: const Color(0xFF1A1D24),
-                      child: const Icon(Icons.image, size: 48, color: Colors.grey),
+                  child: ShaderMask(
+                    shaderCallback: (rect) {
+                      return LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, isDark ? const Color(0xFF0F1115) : const Color(0xFFF4F6F9)],
+                        stops: const [0.6, 1.0],
+                      ).createShader(rect);
+                    },
+                    blendMode: BlendMode.dstOut,
+                    child: Image.network(
+                      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Theme.of(context).cardColor,
+                        child: const Icon(Icons.image, size: 48, color: Colors.grey),
+                      ),
                     ),
                   ),
                 ),
@@ -273,6 +310,89 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 10),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// --- Menu Options ---
+class OptionsScreen extends StatefulWidget {
+  const OptionsScreen({Key? key}) : super(key: key);
+  @override
+  State<OptionsScreen> createState() => _OptionsScreenState();
+}
+
+class _OptionsScreenState extends State<OptionsScreen> {
+  final TextEditingController _githubController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGithubLink();
+  }
+
+  Future<void> _loadGithubLink() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _githubController.text = prefs.getString('github_link') ?? '';
+    });
+  }
+
+  Future<void> _saveGithubLink(String val) async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setString('github_link', val);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    bool isDark = themeNotifier.value == ThemeMode.dark;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Options')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          SwitchListTile(
+            title: const Text('Mode Sombre'),
+            value: isDark,
+            onChanged: (val) async {
+              setState(() {});
+              themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+              final prefs = await SharedPreferences.getInstance();
+              prefs.setBool('is_dark_theme', val);
+            },
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.0),
+            child: Text('Lien du projet GitHub', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          TextField(
+            controller: _githubController,
+            decoration: const InputDecoration(
+              hintText: 'https://github.com/ton-projet',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: _saveGithubLink,
+          ),
+          const Divider(height: 30),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('À propos'),
+            subtitle: const Text('Version 1.1.0 • Carnet de Musculation'),
+            onTap: () {
+              showAboutDialog(
+                context: context,
+                applicationName: 'Carnet de Musculation',
+                applicationVersion: '1.1.0',
+                applicationLegalese: 'Développé pour un suivi d\'entraînement intensif.',
+                children: const [
+                  SizedBox(height: 10),
+                  Text('Application complète de suivi de séances, gestion d\'exercices et chronométrage.'),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -288,7 +408,6 @@ class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderSt
   late TabController _tabController;
   final Stopwatch _stopwatch = Stopwatch();
   Timer? _stopwatchTimer;
-
   Timer? _countdownTimer;
   int _countdownSeconds = 90;
   int _currentCountdown = 90;
@@ -468,9 +587,9 @@ class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderSt
                       },
                       style: OutlinedButton.styleFrom(
                         backgroundColor: isSelected ? const Color(0xFF0D9488).withOpacity(0.3) : Colors.transparent,
-                        side: BorderSide(color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF2D3748)),
+                        side: BorderSide(color: isSelected ? const Color(0xFF0D9488) : Colors.grey),
                       ),
-                      child: Text('${sec}s', style: TextStyle(color: isSelected ? const Color(0xFF10B981) : Colors.white)),
+                      child: Text('${sec}s', style: TextStyle(color: isSelected ? const Color(0xFF10B981) : Theme.of(context).textTheme.bodyLarge?.color)),
                     );
                   }).toList(),
                 ),
@@ -512,4 +631,906 @@ class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderSt
   }
 
   String _formatStopwatchTime(Duration duration) {
-    String twoDigits(int n) => n
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    final tenths = (duration.inMilliseconds.remainder(1000) ~/ 100);
+    return '$minutes:$seconds.$tenths';
+  }
+}
+
+Widget buildMediaWidget(String path, {BoxFit fit = BoxFit.cover}) {
+  if (path.startsWith('http')) {
+    return Image.network(
+      path,
+      fit: fit,
+      errorBuilder: (context, error, stackTrace) => Container(
+        color: const Color(0xFF1A1D24),
+        child: const Icon(Icons.fitness_center, size: 64, color: Colors.grey),
+      ),
+    );
+  } else {
+    return Image.file(
+      File(path),
+      fit: fit,
+      errorBuilder: (context, error, stackTrace) => Container(
+        color: const Color(0xFF1A1D24),
+        child: const Icon(Icons.fitness_center, size: 64, color: Colors.grey),
+      ),
+    );
+  }
+}
+
+class ExerciseDetailScreen extends StatelessWidget {
+  final ExerciseModel exercise;
+  const ExerciseDetailScreen({Key? key, required this.exercise}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(exercise.nom), backgroundColor: Colors.transparent),
+      body: ListView(
+        children: [
+          SizedBox(
+            height: 260,
+            child: PageView.builder(
+              itemCount: exercise.images.length,
+              itemBuilder: (context, index) {
+                return buildMediaWidget(exercise.images[index], fit: BoxFit.cover);
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exercise.nom,
+                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: exercise.tags.map((tag) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF2D3748)),
+                    ),
+                    child: Text(tag, style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 13, fontWeight: FontWeight.w500)),
+                  )).toList(),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Instructions',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                ...List.generate(exercise.steps.length, (index) => Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2D3748)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Step ${index + 1}',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        exercise.steps[index],
+                        style: const TextStyle(fontSize: 14, color: Colors.grey, height: 1.4),
+                      ),
+                    ],
+                  ),
+                )),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Écran de sélection d'exercice pour la séance (Même présentation que Gérer les exercices) ---
+class SelectExerciseForSessionScreen extends StatefulWidget {
+  const SelectExerciseForSessionScreen({Key? key}) : super(key: key);
+  @override
+  State<SelectExerciseForSessionScreen> createState() => _SelectExerciseForSessionScreenState();
+}
+
+class _SelectExerciseForSessionScreenState extends State<SelectExerciseForSessionScreen> {
+  String _filtreTag = 'Tous';
+  bool _triAlphabetique = true;
+
+  @override
+  Widget build(BuildContext context) {
+    Set<String> tousLesTags = {'Tous'};
+    for (var exo in DatabaseHelper.instance.exercicesDisponibles) {
+      tousLesTags.addAll(exo.tags);
+    }
+
+    List<ExerciseModel> exercicesAffiches = DatabaseHelper.instance.exercicesDisponibles.where((exo) {
+      if (_filtreTag == 'Tous') return true;
+      return exo.tags.contains(_filtreTag);
+    }).toList();
+
+    if (_triAlphabetique) {
+      exercicesAffiches.sort((a, b) => a.nom.compareTo(b.nom));
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Sélectionner un exercice'),
+        backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            icon: Icon(_triAlphabetique ? Icons.sort_by_alpha : Icons.list),
+            tooltip: 'Trier',
+            onPressed: () => setState(() => _triAlphabetique = !_triAlphabetique),
+          )
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(
+            height: 55,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: tousLesTags.map((tag) {
+                bool isSelected = _filtreTag == tag;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(tag),
+                    selected: isSelected,
+                    selectedColor: const Color(0xFF3B82F6),
+                    labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.grey),
+                    onSelected: (selected) {
+                      setState(() => _filtreTag = tag);
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: exercicesAffiches.length,
+              itemBuilder: (context, index) {
+                final exercise = exercicesAffiches[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2D3748)),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: buildMediaWidget(exercise.images.first, fit: BoxFit.cover),
+                      ),
+                    ),
+                    title: Text(exercise.nom, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    subtitle: Text(exercise.tags.join(' • '), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => ActiveSessionScreen(exercise: exercise)),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Écran de séance en 2 pages (1: Photos rognées + description, 2: Chrono, reps, poids) ---
+class ActiveSessionScreen extends StatefulWidget {
+  final ExerciseModel exercise;
+  const ActiveSessionScreen({Key? key, required this.exercise}) : super(key: key);
+
+  @override
+  State<ActiveSessionScreen> createState() => _ActiveSessionScreenState();
+}
+
+class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
+  final List<SerieItem> series = [SerieItem()];
+  Timer? _restTimer;
+  int _currentRest = 0;
+  int _dureeRecupChoisie = 90;
+  bool _estParCote = false;
+
+  void _startCentralRest(int seconds) {
+    setState(() => _currentRest = seconds);
+    _restTimer?.cancel();
+    _restTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_currentRest > 0) {
+        setState(() => _currentRest--);
+      } else {
+        _restTimer?.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _restTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.exercise.nom),
+          backgroundColor: Colors.transparent,
+          bottom: const TabBar(
+            indicatorColor: Color(0xFF3B82F6),
+            labelColor: Color(0xFF3B82F6),
+            unselectedLabelColor: Colors.grey,
+            tabs: [
+              Tab(text: 'Description & Photos', icon: Icon(Icons.info_outline)),
+              Tab(text: 'Saisir la Séance', icon: Icon(Icons.fitness_center)),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            // Page 1 : Photos rognées (cover) avec toute la description
+            ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                SizedBox(
+                  height: 240,
+                  child: PageView.builder(
+                    itemCount: widget.exercise.images.length,
+                    itemBuilder: (context, index) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: buildMediaWidget(widget.exercise.images[index], fit: BoxFit.cover),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(widget.exercise.nom, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.exercise.tags.map((tag) => Chip(label: Text(tag))).toList(),
+                ),
+                const SizedBox(height: 20),
+                const Text('Instructions :', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                ...widget.exercise.steps.map((step) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Text('• $step', style: const TextStyle(fontSize: 15, color: Colors.grey)),
+                )),
+              ],
+            ),
+            // Page 2 : Présentation inchangée avec chrono, reps, poids, etc.
+            ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2D3748)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Récupération :', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                          ToggleButtons(
+                            isSelected: [_dureeRecupChoisie == 90, _dureeRecupChoisie == 180, _dureeRecupChoisie == 300],
+                            onPressed: (index) {
+                              setState(() {
+                                if (index == 0) _dureeRecupChoisie = 90;
+                                if (index == 1) _dureeRecupChoisie = 180;
+                                if (index == 2) _dureeRecupChoisie = 300;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            selectedColor: Colors.white,
+                            fillColor: const Color(0xFF0D9488),
+                            color: Colors.grey,
+                            constraints: const BoxConstraints(minHeight: 32, minWidth: 54),
+                            children: const [
+                              Text('90s', style: TextStyle(fontSize: 12)),
+                              Text('180s', style: TextStyle(fontSize: 12)),
+                              Text('300s', style: TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _startCentralRest(_dureeRecupChoisie),
+                          icon: const Icon(Icons.timer, size: 18),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D9488),
+                            foregroundColor: Colors.white,
+                          ),
+                          label: Text('Lancer le repos (${_dureeRecupChoisie}s)'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (_currentRest > 0)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D9488).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF0D9488)),
+                    ),
+                    child: Center(
+                      child: Text('Repos en cours : $_currentRest s',
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                    ),
+                  ),
+                CheckboxListTile(
+                  title: const Text('Exercice unilatéral (par côté)', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                  value: _estParCote,
+                  activeColor: const Color(0xFF3B82F6),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  onChanged: (val) => setState(() => _estParCote = val ?? false),
+                ),
+                const SizedBox(height: 10),
+                ...List.generate(series.length, (i) => Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2D3748)),
+                  ),
+                  child: Row(
+                    children: [
+                      Text('S${i+1}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: series[i].poidsCtrl,
+                          decoration: const InputDecoration(labelText: 'Poids (kg)', isDense: true, border: OutlineInputBorder()),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: series[i].repsCtrl,
+                          decoration: const InputDecoration(labelText: 'Reps', isDense: true, border: OutlineInputBorder()),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                        onPressed: () => setState(() => series.removeAt(i)),
+                      ),
+                    ],
+                  ),
+                )),
+                TextButton.icon(
+                  onPressed: () => setState(() => series.add(SerieItem())),
+                  icon: const Icon(Icons.add, color: Color(0xFF3B82F6)),
+                  label: const Text('Ajouter une série', style: TextStyle(color: Color(0xFF3B82F6))),
+                ),
+                const SizedBox(height: 30),
+                ElevatedButton(
+                  onPressed: () async {
+                    List<Map<String, String>> seriesData = series.map((s) => {
+                      'poids': s.poidsCtrl.text.isEmpty ? '0' : s.poidsCtrl.text,
+                      'reps': s.repsCtrl.text.isEmpty ? '0' : s.repsCtrl.text,
+                    }).toList();
+
+                    await DatabaseHelper.instance.ajouterSeance({
+                      'date': DateTime.now().toString().substring(0, 16),
+                      'exercice': _estParCote ? '${widget.exercise.nom} (par côté)' : widget.exercise.nom,
+                      'series': seriesData,
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Séance enregistrée !')));
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('TERMINER LA SÉANCE', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                )
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SerieItem {
+  final TextEditingController poidsCtrl = TextEditingController();
+  final TextEditingController repsCtrl = TextEditingController();
+}
+
+class GestionExercicesScreen extends StatefulWidget {
+  const GestionExercicesScreen({Key? key}) : super(key: key);
+  @override
+  State<GestionExercicesScreen> createState() => _GestionExercicesScreenState();
+}
+
+class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
+  final ImagePicker _picker = ImagePicker();
+  String _filtreTag = 'Tous';
+  bool _triAlphabetique = true;
+
+  void _ouvrirDialogEdition({ExerciseModel? exerciceExistant}) {
+    final nomCtrl = TextEditingController(text: exerciceExistant?.nom ?? '');
+    final tagsCtrl = TextEditingController(text: exerciceExistant?.tags.join(', ') ?? 'Musculation');
+    final stepsCtrl = TextEditingController(text: exerciceExistant?.steps.join('\n') ?? 'Étape 1 : Réaliser le mouvement.');
+    List<String> imagesList = List.from(exerciceExistant?.images ?? ['https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600']);
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          backgroundColor: Theme.of(context).cardColor,
+          title: Text(exerciceExistant == null ? 'Nouvel exercice' : 'Modifier l\'exercice'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nomCtrl,
+                  decoration: const InputDecoration(labelText: 'Nom de l\'exercice', labelStyle: TextStyle(color: Colors.grey)),
+                ),
+                const SizedBox(height: 14),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Photos / Animations :', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 70,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: imagesList.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == imagesList.length) {
+                        return Container(
+                          width: 70,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2D3748),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.add_a_photo, color: Colors.white),
+                            onPressed: () async {
+                              final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                              if (image != null) {
+                                setStateDialog(() {
+                                  imagesList.add(image.path);
+                                });
+                              }
+                            },
+                          ),
+                        );
+                      }
+                      return Stack(
+                        children: [
+                          Container(
+                            width: 70,
+                            margin: const EdgeInsets.only(right: 8),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: buildMediaWidget(imagesList[index], fit: BoxFit.cover),
+                            ),
+                          ),
+                          Positioned(
+                            right: 8,
+                            top: 0,
+                            child: GestureDetector(
+                              onTap: () {
+                                setStateDialog(() {
+                                  imagesList.removeAt(index);
+                                });
+                              },
+                              child: Container(
+                                color: Colors.black54,
+                                child: const Icon(Icons.close, size: 16, color: Colors.red),
+                              ),
+                            ),
+                          )
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: tagsCtrl,
+                  decoration: const InputDecoration(labelText: 'Tags / Mots-clés (séparés par virgules)', labelStyle: TextStyle(color: Colors.grey)),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: stepsCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Étapes / Steps (une par ligne)', labelStyle: TextStyle(color: Colors.grey)),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler', style: TextStyle(color: Colors.grey))),
+            ElevatedButton(
+              onPressed: () async {
+                final nouveauNom = nomCtrl.text.trim();
+                final nouveauxTags = tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+                final nouvellesSteps = stepsCtrl.text.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+
+                if (nouveauNom.isNotEmpty) {
+                  final model = ExerciseModel(
+                    nom: nouveauNom,
+                    images: imagesList.isNotEmpty ? imagesList : ['https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600'],
+                    tags: nouveauxTags.isNotEmpty ? nouveauxTags : ['Musculation'],
+                    steps: nouvellesSteps.isNotEmpty ? nouvellesSteps : ['Étape 1 : Réaliser le mouvement.'],
+                  );
+
+                  if (exerciceExistant == null) {
+                    await DatabaseHelper.instance.ajouterExerciceComplet(model);
+                  } else {
+                    await DatabaseHelper.instance.modifierExerciceComplet(exerciceExistant.nom, model);
+                  }
+                  Navigator.pop(context);
+                  setState(() {});
+                }
+              },
+              child: Text(exerciceExistant == null ? 'Ajouter' : 'Enregistrer'),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Set<String> tousLesTags = {'Tous'};
+    for (var exo in DatabaseHelper.instance.exercicesDisponibles) {
+      tousLesTags.addAll(exo.tags);
+    }
+
+    List<ExerciseModel> exercicesAffiches = DatabaseHelper.instance.exercicesDisponibles.where((exo) {
+      if (_filtreTag == 'Tous') return true;
+      return exo.tags.contains(_filtreTag);
+    }).toList();
+
+    if (_triAlphabetique) {
+      exercicesAffiches.sort((a, b) => a.nom.compareTo(b.nom));
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Bibliothèque d\'exercices'),
+        backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            icon: Icon(_triAlphabetique ? Icons.sort_by_alpha : Icons.list),
+            tooltip: 'Trier',
+            onPressed: () => setState(() => _triAlphabetique = !_triAlphabetique),
+          )
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(
+            height: 55,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: tousLesTags.map((tag) {
+                bool isSelected = _filtreTag == tag;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(tag),
+                    selected: isSelected,
+                    selectedColor: const Color(0xFF3B82F6),
+                    labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.grey),
+                    onSelected: (selected) {
+                      setState(() => _filtreTag = tag);
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: exercicesAffiches.length,
+              itemBuilder: (context, index) {
+                final exercise = exercicesAffiches[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2D3748)),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: buildMediaWidget(exercise.images.first, fit: BoxFit.cover),
+                      ),
+                    ),
+                    title: Text(exercise.nom, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    subtitle: Text(exercise.tags.join(' • '), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => ExerciseDetailScreen(exercise: exercise)),
+                      );
+                    },
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.grey, size: 20),
+                      onPressed: () => _ouvrirDialogEdition(exerciceExistant: exercise),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFF3B82F6),
+        onPressed: () => _ouvrirDialogEdition(),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+}
+
+class HistoryScreen extends StatefulWidget {
+  const HistoryScreen({Key? key}) : super(key: key);
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  String filtreExercice = 'Tous les exercices';
+
+  @override
+  Widget build(BuildContext context) {
+    final List<String> optionsFiltre = [
+      'Tous les exercices',
+      ...DatabaseHelper.instance.exercicesDisponibles.map((e) => e.nom)
+    ];
+
+    final toutesLesSessions = DatabaseHelper.instance.sessionsSauvegardees;
+    
+    final sessionsFiltreesAvecIndex = <MapEntry<int, Map<String, dynamic>>>[];
+    for (int i = 0; i < toutesLesSessions.length; i++) {
+      if (filtreExercice == 'Tous les exercices' || 
+          toutesLesSessions[i]['exercice'] == filtreExercice || 
+          toutesLesSessions[i]['exercice'] == '$filtreExercice (par côté)') {
+        sessionsFiltreesAvecIndex.add(MapEntry(i, toutesLesSessions[i]));
+      }
+    }
+
+    double maxPoidsGlobal = 0;
+    List<Map<String, dynamic>> dataGraphique = [];
+    
+    if (filtreExercice != 'Tous les exercices') {
+      for (var item in sessionsFiltreesAvecIndex.reversed) {
+        final s = item.value;
+        final List seriesList = s['series'] ?? [];
+        double maxPoidsSession = 0;
+        for (var serie in seriesList) {
+          double p = double.tryParse(serie['poids'].toString()) ?? 0;
+          if (p > maxPoidsSession) maxPoidsSession = p;
+          if (p > maxPoidsGlobal) maxPoidsGlobal = p;
+        }
+        dataGraphique.add({
+          'date': s['date'].toString().substring(5, 10),
+          'poids': maxPoidsSession,
+        });
+      }
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Historique & Progression'), backgroundColor: Colors.transparent),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: DropdownButtonFormField<String>(
+              value: optionsFiltre.contains(filtreExercice) ? filtreExercice : 'Tous les exercices',
+              dropdownColor: Theme.of(context).cardColor,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'Filtrer par exercice',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: optionsFiltre.map((String nom) {
+                return DropdownMenuItem<String>(
+                  value: nom,
+                  child: Text(nom),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() => filtreExercice = newValue);
+                }
+              },
+            ),
+          ),
+          if (filtreExercice != 'Tous les exercices') ...[
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2D3748)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Record Personnel (Max)', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      Text('${maxPoidsGlobal.toStringAsFixed(1)} kg', style: const TextStyle(color: Color(0xFF10B981), fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Évolution du poids max par séance', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  dataGraphique.isEmpty
+                      ? const Text('Pas assez de données pour afficher le graphique', style: TextStyle(color: Colors.grey, fontSize: 12))
+                      : SizedBox(
+                          height: 120,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: dataGraphique.map((d) {
+                              double poids = d['poids'];
+                              double hauteur = maxPoidsGlobal > 0 ? (poids / maxPoidsGlobal) * 85 : 10;
+                              if (hauteur < 10) hauteur = 10;
+                              return Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text('${poids.toInt()}kg', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    width: 26,
+                                    height: hauteur,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF3B82F6),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(d['date'], style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                ],
+              ),
+            ),
+          ],
+          Expanded(
+            child: sessionsFiltreesAvecIndex.isEmpty
+                ? const Center(child: Text('Aucune séance enregistrée pour cet exercice', style: TextStyle(color: Colors.grey)))
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: sessionsFiltreesAvecIndex.length,
+                    itemBuilder: (context, index) {
+                      final itemReel = sessionsFiltreesAvecIndex[sessionsFiltreesAvecIndex.length - 1 - index];
+                      final int indexGlobal = itemReel.key;
+                      final s = itemReel.value;
+                      final List seriesList = s['series'] ?? [];
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF2D3748)),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(s['exercice'],
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
+                                  ),
+                                  Text(s['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                  const SizedBox(width: 8),
+                                  InkWell(
+                                    onTap: () async {
+                                      await DatabaseHelper.instance.supprimerSeance(indexGlobal);
+                                      setState(() {});
+                                    },
+                                    child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                                  ),
+                                ],
+                              ),
+                              const Divider(color: Color(0xFF2D3748), height: 20),
+                              ...List.generate(seriesList.length, (i) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  'Série ${i+1} : ${seriesList[i]['poids']} kg x ${seriesList[i]['reps']} reps',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              )),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
