@@ -28,6 +28,7 @@ jobs:
           rm -rf clean_build/lib/main.dart
           cp -r lib/. clean_build/lib/
           cp pubspec.yaml clean_build/pubspec.yaml
+          cp -r assets clean_build/assets
           cp upload-keystore.jks clean_build/android/app/upload-keystore.jks
           cp key.properties clean_build/android/key.properties
           
