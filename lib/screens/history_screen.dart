@@ -12,6 +12,11 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   String filtreExercice = 'Tous les exercices';
 
+  // Nettoie le nom de l'exercice au cas où il y a "(par côté)"
+  String _nettoyerNom(String nomExercice) {
+    return nomExercice.replaceAll(' (par côté)', '').trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<String> optionsFiltre = [
@@ -24,8 +29,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final sessionsFiltreesAvecIndex = <MapEntry<int, Map<String, dynamic>>>[];
     for (int i = 0; i < toutesLesSessions.length; i++) {
       if (filtreExercice == 'Tous les exercices' || 
-          toutesLesSessions[i]['exercice'] == filtreExercice || 
-          toutesLesSessions[i]['exercice'] == '$filtreExercice (par côté)') {
+          _nettoyerNom(toutesLesSessions[i]['exercice']) == _nettoyerNom(filtreExercice)) {
         sessionsFiltreesAvecIndex.add(MapEntry(i, toutesLesSessions[i]));
       }
     }
@@ -170,6 +174,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       final int indexGlobal = itemReel.key;
                       final s = itemReel.value;
                       final List seriesList = s['series'] ?? [];
+                      final String nomExoBrut = s['exercice'];
+                      final String nomExoNettoye = _nettoyerNom(nomExoBrut);
 
                       double volumeTotalSeance = 0;
                       for (var serie in seriesList) {
@@ -178,49 +184,62 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         volumeTotalSeance += (p * r);
                       }
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF2D3748)),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(s['exercice'],
-                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
-                                  ),
-                                  Text(s['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                  const SizedBox(width: 8),
-                                  InkWell(
-                                    onTap: () async {
-                                      HapticFeedback.mediumImpact();
-                                      await DatabaseHelper.instance.supprimerSeance(indexGlobal);
-                                      setState(() {});
-                                    },
-                                    child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text('Volume total : ${volumeTotalSeance.toStringAsFixed(0)} kg',
-                                  style: const TextStyle(fontSize: 13, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
-                              const Divider(color: Color(0xFF2D3748), height: 16),
-                              ...List.generate(seriesList.length, (i) => Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: Text(
-                                  'Série ${i+1} : ${seriesList[i]['poids']} kg x ${seriesList[i]['reps']} reps',
-                                  style: const TextStyle(fontSize: 14),
+                      return GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            // Si l'exercice existe dans les options, on filtre dessus au clic
+                            if (optionsFiltre.contains(nomExoNettoye)) {
+                              filtreExercice = nomExoNettoye;
+                            } else {
+                              filtreExercice = nomExoBrut;
+                            }
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF2D3748)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(nomExoBrut,
+                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
+                                    ),
+                                    Text(s['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                    const SizedBox(width: 8),
+                                    InkWell(
+                                      onTap: () async {
+                                        HapticFeedback.mediumImpact();
+                                        await DatabaseHelper.instance.supprimerSeance(indexGlobal);
+                                        setState(() {});
+                                      },
+                                      child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                                    ),
+                                  ],
                                 ),
-                              )),
-                            ],
+                                const SizedBox(height: 4),
+                                Text('Volume total : ${volumeTotalSeance.toStringAsFixed(0)} kg',
+                                    style: const TextStyle(fontSize: 13, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
+                                const Divider(color: Color(0xFF2D3748), height: 16),
+                                ...List.generate(seriesList.length, (i) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Text(
+                                    'Série ${i+1} : ${seriesList[i]['poids']} kg x ${seriesList[i]['reps']} reps',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                )),
+                              ],
+                            ),
                           ),
                         ),
                       );
