@@ -5,7 +5,6 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 
-// Notifier global pour le changement de thème dynamique
 ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 
 void main() async {
@@ -176,10 +175,10 @@ class CarnetMusculationApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeNotifier,
-      builder: (_, Mode, __) {
+      builder: (_, mode, __) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          themeMode: Mode,
+          themeMode: mode,
           theme: ThemeData(
             brightness: Brightness.light,
             scaffoldBackgroundColor: const Color(0xFFF4F6F9),
@@ -276,7 +275,6 @@ class HomeScreen extends StatelessWidget {
               label: const Text('Historique & Progression', style: TextStyle(fontSize: 15)),
             ),
             const SizedBox(height: 20),
-            // Zone d'illustration fondue dans le thème
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -291,7 +289,7 @@ class HomeScreen extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [Colors.transparent, isDark ? const Color(0xFF0F1115) : const Color(0xFFF4F6F9)],
-                        stops: const [0.6, 1.0],
+                        stops: const [0.5, 1.0],
                       ).createShader(rect);
                     },
                     blendMode: BlendMode.dstOut,
@@ -315,7 +313,6 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-// --- Menu Options ---
 class OptionsScreen extends StatefulWidget {
   const OptionsScreen({Key? key}) : super(key: key);
   @override
@@ -378,12 +375,12 @@ class _OptionsScreenState extends State<OptionsScreen> {
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('À propos'),
-            subtitle: const Text('Version 1.1.0 • Carnet de Musculation'),
+            subtitle: const Text('Version 1.2.0 • Carnet de Musculation'),
             onTap: () {
               showAboutDialog(
                 context: context,
                 applicationName: 'Carnet de Musculation',
-                applicationVersion: '1.1.0',
+                applicationVersion: '1.2.0',
                 applicationLegalese: 'Développé pour un suivi d\'entraînement intensif.',
                 children: const [
                   SizedBox(height: 10),
@@ -545,8 +542,7 @@ class _ChronoScreenState extends State<ChronoScreen> with SingleTickerProviderSt
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _stopAndResetStopwatch,
-                        icon: const Icon(Icons.stop, color: Colors.white),
+                        onPressed: _stop, color: Colors.white),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFEF4444),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -676,7 +672,7 @@ class ExerciseDetailScreen extends StatelessWidget {
             child: PageView.builder(
               itemCount: exercise.images.length,
               itemBuilder: (context, index) {
-                return buildMediaWidget(exercise.images[index], fit: BoxFit.cover);
+                return buildMediaWidget(exercise.images[index], fit: BoxFit.contain);
               },
             ),
           ),
@@ -747,7 +743,6 @@ class ExerciseDetailScreen extends StatelessWidget {
   }
 }
 
-// --- Écran de sélection d'exercice pour la séance (Même présentation que Gérer les exercices) ---
 class SelectExerciseForSessionScreen extends StatefulWidget {
   const SelectExerciseForSessionScreen({Key? key}) : super(key: key);
   @override
@@ -830,7 +825,7 @@ class _SelectExerciseForSessionScreenState extends State<SelectExerciseForSessio
                       child: SizedBox(
                         width: 50,
                         height: 50,
-                        child: buildMediaWidget(exercise.images.first, fit: BoxFit.cover),
+                        child: buildMediaWidget(exercise.images.first, fit: BoxFit.contain),
                       ),
                     ),
                     title: Text(exercise.nom, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
@@ -852,7 +847,6 @@ class _SelectExerciseForSessionScreenState extends State<SelectExerciseForSessio
   }
 }
 
-// --- Écran de séance en 2 pages (1: Photos rognées + description, 2: Chrono, reps, poids) ---
 class ActiveSessionScreen extends StatefulWidget {
   final ExerciseModel exercise;
   const ActiveSessionScreen({Key? key, required this.exercise}) : super(key: key);
@@ -867,6 +861,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   int _currentRest = 0;
   int _dureeRecupChoisie = 90;
   bool _estParCote = false;
+  final ImagePicker _picker = ImagePicker();
 
   void _startCentralRest(int seconds) {
     setState(() => _currentRest = seconds);
@@ -888,6 +883,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -906,40 +902,105 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         ),
         body: TabBarView(
           children: [
-            // Page 1 : Photos rognées (cover) avec toute la description
+            // Page 1 : Images non rognées avec fondu et pavés séparés pour les instructions + Choix d'image
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                SizedBox(
-                  height: 240,
-                  child: PageView.builder(
-                    itemCount: widget.exercise.images.length,
-                    itemBuilder: (context, index) {
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: buildMediaWidget(widget.exercise.images[index], fit: BoxFit.cover),
-                      );
-                    },
-                  ),
+                Stack(
+                  children: [
+                    SizedBox(
+                      height: 260,
+                      child: ShaderMask(
+                        shaderCallback: (rect) {
+                          return LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, isDark ? const Color(0xFF0F1115) : const Color(0xFFF4F6F9)],
+                            stops: const [0.75, 1.0],
+                          ).createShader(rect);
+                        },
+                        blendMode: BlendMode.dstOut,
+                        child: PageView.builder(
+                          itemCount: widget.exercise.images.length,
+                          itemBuilder: (context, index) {
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: buildMediaWidget(widget.exercise.images[index], fit: BoxFit.contain),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: FloatingActionButton.small(
+                        backgroundColor: const Color(0xFF3B82F6),
+                        child: const Icon(Icons.add_a_photo, color: Colors.white, size: 18),
+                        onPressed: () async {
+                          final XFile? img = await _picker.pickImage(source: ImageSource.gallery);
+                          if (img != null) {
+                            setState(() {
+                              widget.exercise.images.add(img.path);
+                            });
+                            await DatabaseHelper.instance.sauvegarder();
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 20),
-                Text(widget.exercise.nom, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
+                Text(widget.exercise.nom, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: widget.exercise.tags.map((tag) => Chip(label: Text(tag))).toList(),
+                  children: widget.exercise.tags.map((tag) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF2D3748)),
+                    ),
+                    child: Text(tag, style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 13, fontWeight: FontWeight.w500)),
+                  )).toList(),
                 ),
-                const SizedBox(height: 20),
-                const Text('Instructions :', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
-                ...widget.exercise.steps.map((step) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Text('• $step', style: const TextStyle(fontSize: 15, color: Colors.grey)),
+                const SizedBox(height: 24),
+                const Text('Instructions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                ...List.generate(widget.exercise.steps.length, (index) => Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2D3748)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Step ${index + 1}',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.exercise.steps[index],
+                        style: const TextStyle(fontSize: 14, color: Colors.grey, height: 1.4),
+                      ),
+                    ],
+                  ),
                 )),
               ],
             ),
-            // Page 2 : Présentation inchangée avec chrono, reps, poids, etc.
+            // Page 2 : Saisie des séries, poids, répétitions et chronomètre
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -1167,7 +1228,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                             margin: const EdgeInsets.only(right: 8),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: buildMediaWidget(imagesList[index], fit: BoxFit.cover),
+                              child: buildMediaWidget(imagesList[index], fit: BoxFit.contain),
                             ),
                           ),
                           Positioned(
@@ -1309,7 +1370,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                       child: SizedBox(
                         width: 50,
                         height: 50,
-                        child: buildMediaWidget(exercise.images.first, fit: BoxFit.cover),
+                        child: buildMediaWidget(exercise.images.first, fit: BoxFit.contain),
                       ),
                     ),
                     title: Text(exercise.nom, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
