@@ -205,8 +205,29 @@ class CarnetMusculationApp extends StatelessWidget {
   }
 }
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String? _homeImagePath;
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHomeImage();
+  }
+
+  Future<void> _loadHomeImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _homeImagePath = prefs.getString('home_image_path');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -276,30 +297,51 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isDark ? const Color(0xFF2D3748) : Colors.grey.shade300),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: ShaderMask(
-                    shaderCallback: (rect) {
-                      return LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, isDark ? const Color(0xFF0F1115) : const Color(0xFFF4F6F9)],
-                        stops: const [0.5, 1.0],
-                      ).createShader(rect);
-                    },
-                    blendMode: BlendMode.dstOut,
-                    child: Image.network(
-                      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Theme.of(context).cardColor,
-                        child: const Icon(Icons.image, size: 48, color: Colors.grey),
-                      ),
+              child: GestureDetector(
+                onTap: () async {
+                  final XFile? img = await _picker.pickImage(source: ImageSource.gallery);
+                  if (img != null) {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('home_image_path', img.path);
+                    setState(() {
+                      _homeImagePath = img.path;
+                    });
+                  }
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isDark ? const Color(0xFF2D3748) : Colors.grey.shade300),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: ShaderMask(
+                      shaderCallback: (rect) {
+                        return LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, isDark ? const Color(0xFF0F1115) : const Color(0xFFF4F6F9)],
+                          stops: const [0.5, 1.0],
+                        ).createShader(rect);
+                      },
+                      blendMode: BlendMode.dstOut,
+                      child: _homeImagePath != null
+                          ? Image.file(
+                              File(_homeImagePath!),
+                              fit: BoxFit.cover,
+                              errorBuilder: (c, e, s) => Container(
+                                color: Theme.of(context).cardColor,
+                                child: const Icon(Icons.image, size: 48, color: Colors.grey),
+                              ),
+                            )
+                          : Image.network(
+                              'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600',
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Theme.of(context).cardColor,
+                                child: const Icon(Icons.image, size: 48, color: Colors.grey),
+                              ),
+                            ),
                     ),
                   ),
                 ),
