@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../helpers/database_helper.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -30,9 +31,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     double maxPoidsGlobal = 0;
-    List<Map<String, dynamic>> dataGraphique = [];
+    List<FlSpot> spots = [];
+    List<String> datesLabels = [];
     
     if (filtreExercice != 'Tous les exercices') {
+      int indexCoord = 0;
       for (var item in sessionsFiltreesAvecIndex.reversed) {
         final s = item.value;
         final List seriesList = s['series'] ?? [];
@@ -42,10 +45,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
           if (p > maxPoidsSession) maxPoidsSession = p;
           if (p > maxPoidsGlobal) maxPoidsGlobal = p;
         }
-        dataGraphique.add({
-          'date': s['date'].toString().substring(5, 10),
-          'poids': maxPoidsSession,
-        });
+        spots.add(FlSpot(indexCoord.toDouble(), maxPoidsSession));
+        datesLabels.add(s['date'].toString().substring(5, 10));
+        indexCoord++;
       }
     }
 
@@ -98,37 +100,59 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const Text('Évolution du poids max par séance', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const Text('Courbe de progression', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  dataGraphique.isEmpty
+                  spots.isEmpty
                       ? const Text('Pas assez de données pour afficher le graphique', style: TextStyle(color: Colors.grey, fontSize: 12))
                       : SizedBox(
-                          height: 120,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: dataGraphique.map((d) {
-                              double poids = d['poids'];
-                              double hauteur = maxPoidsGlobal > 0 ? (poids / maxPoidsGlobal) * 85 : 10;
-                              if (hauteur < 10) hauteur = 10;
-                              return Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Text('${poids.toInt()}kg', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    width: 26,
-                                    height: hauteur,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF3B82F6),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
+                          height: 180,
+                          child: LineChart(
+                            LineChartData(
+                              gridData: const FlGridData(show: false),
+                              titlesData: FlTitlesData(
+                                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                leftTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    reservedSize: 32,
+                                    getTitlesWidget: (value, meta) {
+                                      return Text('${value.toInt()}kg', style: const TextStyle(fontSize: 10, color: Colors.grey));
+                                    },
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(d['date'], style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                                ],
-                              );
-                            }).toList(),
+                                ),
+                                bottomTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    getTitlesWidget: (value, meta) {
+                                      int idx = value.toInt();
+                                      if (idx >= 0 && idx < datesLabels.length) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(top: 6.0),
+                                          child: Text(datesLabels[idx], style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                                        );
+                                      }
+                                      return const Text('');
+                                    },
+                                  ),
+                                ),
+                              ),
+                              borderData: FlBorderData(show: false),
+                              lineBarsData: [
+                                LineChartBarData(
+                                  spots: spots,
+                                  isCurved: true,
+                                  color: const Color(0xFF3B82F6),
+                                  barWidth: 3,
+                                  isStrokeCapRound: true,
+                                  dotData: const FlDotData(show: true),
+                                  belowBarData: BarAreaData(
+                                    show: true,
+                                    color: const Color(0xFF3B82F6).withOpacity(0.15),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                 ],
