@@ -26,10 +26,7 @@ class ExerciseDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  exercise.nom,
-                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                ),
+                Text(exercise.nom, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
@@ -45,10 +42,7 @@ class ExerciseDetailScreen extends StatelessWidget {
                   )).toList(),
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  'Instructions',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+                const Text('Instructions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 ...List.generate(exercise.steps.length, (index) => Container(
                   margin: const EdgeInsets.only(bottom: 16),
@@ -65,17 +59,11 @@ class ExerciseDetailScreen extends StatelessWidget {
                         children: [
                           const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 20),
                           const SizedBox(width: 8),
-                          Text(
-                            'Step ${index + 1}',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
+                          Text('Step ${index + 1}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        exercise.steps[index],
-                        style: const TextStyle(fontSize: 14, color: Colors.grey, height: 1.4),
-                      ),
+                      Text(exercise.steps[index], style: const TextStyle(fontSize: 14, color: Colors.grey, height: 1.4)),
                     ],
                   ),
                 )),
