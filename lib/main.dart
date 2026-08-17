@@ -38,7 +38,7 @@ class CornelMusculationApp extends StatelessWidget {
               secondary: Color(0xFF10B981), // Vert menthe
               surface: Color(0xFF18181B),
             ),
-            cardTheme: CardThemeData(
+            cardTheme: CardTheme(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               elevation: 0,
             ),
