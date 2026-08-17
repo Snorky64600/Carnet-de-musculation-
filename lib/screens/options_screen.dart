@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
+import '../helpers/database_helper.dart';
 
 class OptionsScreen extends StatefulWidget {
   const OptionsScreen({Key? key}) : super(key: key);
@@ -10,76 +13,48 @@ class OptionsScreen extends StatefulWidget {
 }
 
 class _OptionsScreenState extends State<OptionsScreen> {
-  final TextEditingController _githubController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadGithubLink();
-  }
-
-  Future<void> _loadGithubLink() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _githubController.text = prefs.getString('github_link') ?? '';
-    });
-  }
-
-  Future<void> _saveGithubLink(String val) async {
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setString('github_link', val);
-  }
+  bool _healthConnectSync = false;
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = themeNotifier.value == ThemeMode.dark;
     return Scaffold(
-      appBar: AppBar(title: const Text('Options')),
+      appBar: AppBar(title: const Text('Options & Paramètres')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const Text('Synchronisation', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
           SwitchListTile(
-            title: const Text('Mode Sombre'),
-            value: isDark,
-            onChanged: (val) async {
-              HapticFeedback.selectionClick();
-              setState(() {});
-              themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
-              final prefs = await SharedPreferences.getInstance();
-              prefs.setBool('is_dark_theme', val);
+            title: const Text('Synchro Google Health Connect'),
+            value: _healthConnectSync,
+            onChanged: (val) => setState(() => _healthConnectSync = val),
+          ),
+          const Divider(),
+          const Text('Données (Import/Export)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+          ListTile(
+            leading: const Icon(Icons.upload_file),
+            title: const Text('Exporter vers CSV'),
+            onTap: () async {
+              String csvData = DatabaseHelper.instance.exporterEnCsv();
+              await Share.share(csvData, subject: 'Mon Historique Entraînement');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.download),
+            title: const Text('Importer depuis CSV'),
+            onTap: () async {
+              FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+              if (result != null) {
+                // Logic d'import simple via le contenu du fichier
+                // (Note : nécessite dart:io pour lire le fichier local)
+              }
             },
           ),
           const Divider(),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8.0),
-            child: Text('Lien du projet GitHub', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          TextField(
-            controller: _githubController,
-            decoration: const InputDecoration(
-              hintText: 'https://github.com/ton-projet',
-              border: OutlineInputBorder(),
-            ),
-            onChanged: _saveGithubLink,
-          ),
-          const Divider(height: 30),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('À propos'),
-            subtitle: const Text('Version 1.4.0 • Carnet de Musculation'),
-            onTap: () {
-              HapticFeedback.lightImpact();
-              showAboutDialog(
-                context: context,
-                applicationName: 'Carnet de Musculation',
-                applicationVersion: '1.4.0',
-                applicationLegalese: 'Développé pour un suivi d\'entraînement intensif.',
-                children: const [
-                  SizedBox(height: 10),
-                  Text('Application complète de suivi de séances, gestion d\'exercices et chronométrage.'),
-                ],
-              );
-            },
+          const Text('Apparence', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+          SwitchListTile(
+            title: const Text('Mode Sombre'),
+            value: themeNotifier.value == ThemeMode.dark,
+            onChanged: (val) => themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light,
           ),
         ],
       ),
