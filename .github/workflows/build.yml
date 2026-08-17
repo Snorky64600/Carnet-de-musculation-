@@ -25,12 +25,22 @@ jobs:
       - name: Build in clean isolated folder
         run: |
           flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation --platforms=android
-                python3 -c '
-          path = "clean_build/android/build.gradle"
-          with open(path, "r") as f:
+                          python3 -c '
+          # Correction Kotlin
+          path_build = "clean_build/android/build.gradle"
+          with open(path_build, "r") as f:
               content = f.read()
           content = content.replace("ext.kotlin_version = \x271.7.10\x27", "ext.kotlin_version = \x271.9.0\x27")
-          with open(path, "w") as f:
+          with open(path_build, "w") as f:
+              f.write(content)
+
+          # Correction minSdk
+          path_app = "clean_build/android/app/build.gradle"
+          with open(path_app, "r") as f:
+              content = f.read()
+          content = content.replace("minSdkVersion 19", "minSdkVersion 26")
+          content = content.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 26")
+          with open(path_app, "w") as f:
               f.write(content)
           '
                 rm -rf clean_build/lib/main.dart
