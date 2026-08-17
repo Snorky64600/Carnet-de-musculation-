@@ -112,13 +112,11 @@ class DatabaseHelper {
       await sauvegarder();
     }
   }
-}
 
   // --- EXPORT CSV ---
   String exporterEnCsv() {
     List<Map<String, dynamic>> sessions = sessionsSauvegardees;
     StringBuffer csv = StringBuffer();
-    // En-tête du fichier CSV
     csv.writeln('Date,Exercice,Serie,Poids(kg),Reps,RPE,Echec');
 
     for (var session in sessions) {
@@ -183,9 +181,10 @@ class DatabaseHelper {
         }
       });
 
-      sauvegarder(); // Sauvegarde locale dans l'app
+      sauvegarder();
       return true;
     } catch (e) {
       return false;
     }
   }
+}
