@@ -25,16 +25,21 @@ jobs:
       - name: Build in clean isolated folder
         run: |
           flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation --platforms=android
-                          python3 -c '
-          # Correction Kotlin
-          path_build = "clean_build/android/build.gradle"
-          with open(path_build, "r") as f:
-              content = f.read()
-          content = content.replace("ext.kotlin_version = \x271.7.10\x27", "ext.kotlin_version = \x271.9.0\x27")
-          with open(path_build, "w") as f:
-              f.write(content)
+                    python3 -c '
+          import glob
+          # 1. Met à jour Kotlin dans tous les fichiers Gradle (build.gradle et settings.gradle)
+          for path in glob.glob("clean_build/android/**/*.gradle", recursive=True) + ["clean_build/android/settings.gradle"]:
+              try:
+                  with open(path, "r") as f:
+                      content = f.read()
+                  content = content.replace("1.7.10", "1.9.0")
+                  content = content.replace("1.8.10", "1.9.0")
+                  with open(path, "w") as f:
+                      f.write(content)
+              except Exception:
+                  pass
 
-          # Correction minSdk
+          # 2. Force minSdkVersion à 26 pour la compatibilité Health Connect
           path_app = "clean_build/android/app/build.gradle"
           with open(path_app, "r") as f:
               content = f.read()
@@ -43,6 +48,7 @@ jobs:
           with open(path_app, "w") as f:
               f.write(content)
           '
+
                 rm -rf clean_build/lib/main.dart
                 cp -r lib/. clean_build/lib/
                 cp pubspec.yaml clean_build/pubspec.yaml
