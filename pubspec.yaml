@@ -12,6 +12,7 @@ dependencies:
   shared_preferences: ^2.2.3
   image_picker : ^1.0.7
   fl_chart: ^0.68.0
+  health: ^10.2.0 # (ou la version récente compatible)
 
 dev_dependencies:
   flutter_test:
