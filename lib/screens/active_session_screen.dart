@@ -115,18 +115,35 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   }
 
   Future<void> _synchroniserAvecHealthConnect(DateTime debut, DateTime fin) async {
+    Future<void> _synchroniserAvecHealthConnect(DateTime debut, DateTime fin) async {
+    // 1. Initialisation de la factory avec Health Connect activé
     final health = HealthFactory(useHealthConnectIfAvailable: true);
-    final types = [HealthDataType.WORKOUT, HealthDataType.ACTIVE_ENERGY_BURNED];
+
+    // 2. Types de données
+    final types = [
+      HealthDataType.WORKOUT,
+      HealthDataType.ACTIVE_ENERGY_BURNED,
+    ];
+
     try {
+      // 3. Demande de permission
       bool? hasPermissions = await health.hasPermissions(types);
-      bool authorized = hasPermissions == true ? true : (await health.requestAuthorization(types) ?? false);
+      bool authorized = false;
+      
+      if (hasPermissions != true) {
+        authorized = await health.requestAuthorization(types) ?? false;
+      } else {
+        authorized = true;
+      }
+
       if (authorized) {
+        // 4. Écriture des données
         await health.writeWorkoutData(
           activityType: HealthWorkoutActivityType.STRENGTH_TRAINING,
           start: debut,
           end: fin,
           totalEnergyBurned: 250,
-          totalEnergyBurnedUnit: WorkoutEnergyUnit.KILOCALORIE,
+          totalEnergyBurnedUnit: WorkoutEnergyUnit.KILOCALORIES, // Correction : KILOCALORIES (au pluriel)
         );
       }
     } catch (e) {
