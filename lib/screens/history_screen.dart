@@ -33,24 +33,67 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
     }
 
+    // Calculs des métriques globales pour l'exercice sélectionné
     double maxPoidsGlobal = 0;
-    List<FlSpot> spots = [];
+    double meilleur1RMGlobal = 0;
+    double maxVolumeGlobal = 0;
+    List<BarChartRodData> barRods = [];
     List<String> datesLabels = [];
-    
+
     if (filtreExercice != 'Tous les exercices') {
       int indexCoord = 0;
-      for (var item in sessionsFiltreesAvecIndex.reversed) {
+      // On parcourt chronologiquement pour le graphique
+      final sessionsChronologiques = sessionsFiltreesAvecIndex.reversed.toList();
+      for (var item in sessionsChronologiques) {
         final s = item.value;
         final List seriesList = s['series'] ?? [];
         double maxPoidsSession = 0;
+        double max1RMSession = 0;
+        double volumeSession = 0;
+
         for (var serie in seriesList) {
-          double p = double.tryParse(serie['poids'].toString()) ?? 0;
+          final mapSerie = Map<String, dynamic>.from(serie as Map);
+          double p = double.tryParse(mapSerie['poids'].toString()) ?? 0;
+          double r = double.tryParse(mapSerie['reps'].toString()) ?? 0;
+          
           if (p > maxPoidsSession) maxPoidsSession = p;
           if (p > maxPoidsGlobal) maxPoidsGlobal = p;
+
+          // Calcul 1RM Epley par série
+          if (p > 0 && r > 0) {
+            double epley = p * (1 + r / 30.0);
+            if (epley > max1RMSession) max1RMSession = epley;
+            if (epley > meilleur1RMGlobal) meilleur1RMGlobal = epley;
+          }
+          volumeSession += (p * r);
         }
-        spots.add(FlSpot(indexCoord.toDouble(), maxPoidsSession));
+
+        if (volumeSession > maxVolumeGlobal) {
+          maxVolumeGlobal = volumeSession;
+        }
+
+        // On prépare les barres du graphique
+        bool estLeMax = false; // Sera affiné par la suite si c'est le pic
+        barRods.add(
+          BarChartRodData(
+            toY: max1RMSession > 0 ? max1RMSession : maxPoidsSession,
+            color: const Color(0xFF3B82F6),
+            width: 14,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+          ),
+        );
         datesLabels.add(s['date'].toString().substring(5, 10));
         indexCoord++;
+      }
+
+      // Mettre en surbrillance la barre maximale en jaune/or comme sur l'image
+      if (barRods.isNotEmpty) {
+        double maxY = barRods.map((e) => e.toY).reduce((a, b) => a > b ? a : b);
+        for (var rod in barRods) {
+          if (rod.toY == maxY && maxY > 0) {
+            rod.color = Colors.amber; // Couleur Or pour le record
+          }
+        }
       }
     }
 
@@ -84,8 +127,72 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
           if (filtreExercice != 'Tous les exercices') ...[
+            // Encart des 3 indicateurs clés (Meilleur 1RM, Poids Max, Volume Max)
             Container(
-              margin: const EdgeInsets.all(16),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('MEILLEUR 1RM', style: TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Text('${meilleur1RMGlobal.toStringAsFixed(1)} kg', style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF2D3748)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('POIDS MAX', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Text('${maxPoidsGlobal.toStringAsFixed(0)} kg', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF2D3748)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('VOLUME MAX', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Text('${maxVolumeGlobal.toStringAsFixed(0)} kg', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Graphique en barres (BarChart)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
@@ -95,35 +202,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Record Personnel (Max)', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                      Text('${maxPoidsGlobal.toStringAsFixed(1)} kg', style: const TextStyle(color: Color(0xFF10B981), fontSize: 20, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
+                  const Text('1RM (kg)', style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
-                  const Text('Courbe de progression', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  spots.isEmpty
-                      ? const Text('Pas assez de données pour afficher le graphique', style: TextStyle(color: Colors.grey, fontSize: 12))
+                  barRods.isEmpty
+                      ? const Text('Pas assez de données pour le graphique', style: TextStyle(color: Colors.grey, fontSize: 12))
                       : SizedBox(
-                          height: 180,
-                          child: LineChart(
-                            LineChartData(
+                          height: 160,
+                          child: BarChart(
+                            BarChartData(
+                              alignment: BarChartAlignment.spaceAround,
                               gridData: const FlGridData(show: false),
                               titlesData: FlTitlesData(
                                 rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                                 topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                leftTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    reservedSize: 32,
-                                    getTitlesWidget: (value, meta) {
-                                      return Text('${value.toInt()}kg', style: const TextStyle(fontSize: 10, color: Colors.grey));
-                                    },
-                                  ),
-                                ),
+                                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                                 bottomTitles: AxisTitles(
                                   sideTitles: SideTitles(
                                     showTitles: true,
@@ -141,20 +233,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                               ),
                               borderData: FlBorderData(show: false),
-                              lineBarsData: [
-                                LineChartBarData(
-                                  spots: spots,
-                                  isCurved: true,
-                                  color: const Color(0xFF3B82F6),
-                                  barWidth: 3,
-                                  isStrokeCapRound: true,
-                                  dotData: const FlDotData(show: true),
-                                  belowBarData: BarAreaData(
-                                    show: true,
-                                    color: const Color(0xFF3B82F6).withOpacity(0.15),
-                                  ),
-                                ),
-                              ],
+                              barGroups: List.generate(barRods.length, (i) => BarChartGroupData(
+                                x: i,
+                                barRods: [barRods[i]],
+                              )),
                             ),
                           ),
                         ),
@@ -169,18 +251,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: sessionsFiltreesAvecIndex.length,
                     itemBuilder: (context, index) {
-                      final itemReel = sessionsFiltreesAvecIndex[sessionsFiltreesAvecIndex.length - 1 - index];
+                      final itemReel = sessionsFiltreesAvecIndex[index]; // Ordre antéchronologique (plus récent en haut)
                       final int indexGlobal = itemReel.key;
                       final s = itemReel.value;
                       final List seriesList = s['series'] ?? [];
                       final String nomExoBrut = s['exercice'];
                       final String nomExoNettoye = _nettoyerNom(nomExoBrut);
 
-                      double volumeTotalSeance = 0;
+                      // Vérification si cette séance contient le poids max ou un 1RM remarquable
+                      bool estPoidsMaxSeance = false;
                       for (var serie in seriesList) {
                         double p = double.tryParse(serie['poids'].toString()) ?? 0;
-                        double r = double.tryParse(serie['reps'].toString()) ?? 0;
-                        volumeTotalSeance += (p * r);
+                        if (p >= maxPoidsGlobal && maxPoidsGlobal > 0) estPoidsMaxSeance = true;
                       }
 
                       return GestureDetector(
@@ -225,24 +307,45 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text('Volume total : ${volumeTotalSeance.toStringAsFixed(0)} kg',
-                                    style: const TextStyle(fontSize: 13, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
                                 const Divider(color: Color(0xFF2D3748), height: 16),
                                 ...List.generate(seriesList.length, (i) {
                                   final serie = seriesList[i];
+                                  final p = serie['poids']?.toString() ?? '0';
+                                  final r = serie['reps']?.toString() ?? '0';
                                   final rpe = serie['rpe']?.toString() ?? '';
                                   final isEchec = serie['echec'] == true || serie['echec'] == 'true';
                                   
-                                  String details = 'Série ${i+1} : ${serie['poids']} kg x ${serie['reps']} reps';
+                                  // Calcul 1RM individuel pour la ligne
+                                  double pVal = double.tryParse(p) ?? 0;
+                                  double rVal = double.tryParse(r) ?? 0;
+                                  double rmSerie = pVal > 0 && rVal > 0 ? pVal * (1 + rVal / 30.0) : 0;
+
+                                  String details = '$p kg × $r reps';
                                   if (rpe.isNotEmpty) details += ' (RPE $rpe)';
                                   if (isEchec) details += ' 💥 Échec';
+                                  if (rmSerie > 0) details += '  •  1RM: ${rmSerie.toStringAsFixed(1)}';
 
                                   return Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
-                                    child: Text(details, style: const TextStyle(fontSize: 14)),
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Text(details, style: const TextStyle(fontSize: 13, color: Colors.white70)),
                                   );
                                 }),
+                                if (estPoidsMaxSeance) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: Colors.redAccent),
+                                        ),
+                                        child: const Text('POIDS MAX 🔴', style: TextStyle(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ),
+                                ]
                               ],
                             ),
                           ),
