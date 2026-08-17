@@ -113,3 +113,79 @@ class DatabaseHelper {
     }
   }
 }
+
+  // --- EXPORT CSV ---
+  String exporterEnCsv() {
+    List<Map<String, dynamic>> sessions = sessionsSauvegardees;
+    StringBuffer csv = StringBuffer();
+    // En-tête du fichier CSV
+    csv.writeln('Date,Exercice,Serie,Poids(kg),Reps,RPE,Echec');
+
+    for (var session in sessions) {
+      String date = session['date'] ?? '';
+      String exercice = session['exercice'] ?? '';
+      List series = session['series'] ?? [];
+      
+      for (int i = 0; i < series.length; i++) {
+        var s = series[i];
+        csv.writeln('"$date","$exercice","${i+1}","${s['poids']}","${s['reps']}","${s['rpe']}","${s['echec']}"');
+      }
+    }
+    return csv.toString();
+  }
+
+  // --- IMPORT CSV ---
+  bool importerDepuisCsv(String csvContent) {
+    try {
+      List<String> lignes = csvContent.split('\n');
+      if (lignes.length <= 1) return false;
+
+      Map<String, List<Map<String, dynamic>>> sessionsMap = {};
+
+      for (int i = 1; i < lignes.length; i++) {
+        String ligne = lignes[i].trim();
+        if (ligne.isEmpty) continue;
+
+        List<String> colonnes = ligne.split('","');
+        if (colonnes.length < 7) continue;
+
+        String date = colonnes[0].replaceAll('"', '');
+        String exercice = colonnes[1].replaceAll('"', '');
+        String poids = colonnes[3].replaceAll('"', '');
+        String reps = colonnes[4].replaceAll('"', '');
+        String rpe = colonnes[5].replaceAll('"', '');
+        bool echec = colonnes[6].replaceAll('"', '').toLowerCase() == 'true';
+
+        String cleSession = '$date-$exercice';
+        if (!sessionsMap.containsKey(cleSession)) {
+          sessionsMap[cleSession] = [];
+        }
+
+        sessionsMap[cleSession]!.add({
+          'poids': poids,
+          'reps': reps,
+          'rpe': rpe,
+          'echec': echec,
+        });
+      }
+
+      sessionsMap.forEach((cle, seriesList) {
+        int separateur = cle.lastIndexOf('-');
+        if (separateur != -1) {
+          String date = cle.substring(0, separateur);
+          String exercice = cle.substring(separateur + 1);
+          
+          sessionsSauvegardees.add({
+            'date': date,
+            'exercice': exercice,
+            'series': seriesList,
+          });
+        }
+      });
+
+      sauvegarder(); // Sauvegarde locale dans l'app
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
