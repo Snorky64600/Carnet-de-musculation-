@@ -25,6 +25,14 @@ jobs:
       - name: Build in clean isolated folder
         run: |
           flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation --platforms=android
+                python3 -c '
+          path = "clean_build/android/build.gradle"
+          with open(path, "r") as f:
+              content = f.read()
+          content = content.replace("ext.kotlin_version = \x271.7.10\x27", "ext.kotlin_version = \x271.9.0\x27")
+          with open(path, "w") as f:
+              f.write(content)
+          '
                 rm -rf clean_build/lib/main.dart
                 cp -r lib/. clean_build/lib/
                 cp pubspec.yaml clean_build/pubspec.yaml
