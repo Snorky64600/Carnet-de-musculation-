@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:health/health.dart';
 import '../models/exercise_model.dart';
 import '../helpers/database_helper.dart';
 import '../widgets/media_widget.dart';
 
-// Définition de la classe SerieItem placée en haut pour éviter tout problème de portée
 class SerieItem {
   final TextEditingController poidsCtrl = TextEditingController();
   final TextEditingController repsCtrl = TextEditingController();
@@ -31,10 +30,12 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   int _dureeRecupChoisie = 90;
   bool _estParCote = false;
   final ImagePicker _picker = ImagePicker();
+  late DateTime _debutSeance;
 
   @override
   void initState() {
     super.initState();
+    _debutSeance = DateTime.now();
     _chargerDerniereSeance();
   }
 
@@ -67,6 +68,147 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         _estParCote = derniereSession!['exercice'].toString().contains('(par côté)');
       });
     }
+  }
+
+  double get _tonnageTotalSession {
+    double total = 0;
+    for (var s in series) {
+      double p = double.tryParse(s.poidsCtrl.text) ?? 0;
+      double r = double.tryParse(s.repsCtrl.text) ?? 0;
+      total += (p * r);
+    }
+    return total;
+  }
+
+  double get _meilleur1RMEstime {
+    double max1rm = 0;
+    for (var s in series) {
+      double p = double.tryParse(s.poidsCtrl.text) ?? 0;
+      double r = double.tryParse(s.repsCtrl.text) ?? 0;
+      if (p > 0 && r > 0) {
+        double epley = p * (1 + r / 30.0);
+        if (epley > max1rm) max1rm = epley;
+      }
+    }
+    return max1rm;
+  }
+
+  bool _verifierSiNouveauPR() {
+    final toutesLesSessions = DatabaseHelper.instance.sessionsSauvegardees;
+    double maxHistorique = 0;
+    for (var s in toutesLesSessions) {
+      if (s['exercice'] == widget.exercise.nom || s['exercice'] == '${widget.exercise.nom} (par côté)') {
+        final List seriesList = s['series'] ?? [];
+        for (var serie in seriesList) {
+          final mapSerie = Map<String, dynamic>.from(serie as Map);
+          double p = double.tryParse(mapSerie['poids'].toString()) ?? 0;
+          if (p > maxHistorique) maxHistorique = p;
+        }
+      }
+    }
+    double maxActuelSeance = 0;
+    for (var s in series) {
+      double p = double.tryParse(s.poidsCtrl.text) ?? 0;
+      if (p > maxActuelSeance) maxActuelSeance = p;
+    }
+    return maxActuelSeance > maxHistorique && maxActuelSeance > 0;
+  }
+
+  Future<void> _synchroniserAvecHealthConnect(DateTime debut, DateTime fin) async {
+    final health = HealthFactory(useHealthConnectIfAvailable: true);
+    final types = [HealthDataType.WORKOUT, HealthDataType.ACTIVE_ENERGY_BURNED];
+    try {
+      bool? hasPermissions = await health.hasPermissions(types);
+      bool authorized = hasPermissions == true ? true : (await health.requestAuthorization(types) ?? false);
+      if (authorized) {
+        await health.writeWorkoutData(
+          activityType: HealthWorkoutActivityType.STRENGTH_TRAINING,
+          start: debut,
+          end: fin,
+          totalEnergyBurned: 250,
+          totalEnergyBurnedUnit: WorkoutEnergyUnit.KILOCALORIE,
+        );
+      }
+    } catch (e) {
+      debugPrint("Erreur Health Connect : $e");
+    }
+  }
+
+  void _afficherRecapitulatifFinDeSeance(BuildContext context) {
+    DateTime finSeance = DateTime.now();
+    Duration duree = finSeance.difference(_debutSeance);
+    bool estNouveauPR = _verifierSiNouveauPR();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(estNouveauPR ? Icons.emoji_events : Icons.check_circle, 
+                color: estNouveauPR ? Colors.amber : const Color(0xFF10B981), size: 28),
+            const SizedBox(width: 10),
+            const Text('Séance validée ! 💪'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (estNouveauPR) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.star, color: Colors.amber, size: 20),
+                    SizedBox(width: 8),
+                    Text('Nouveau Record Personnel (PR) ! 🏆', 
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            Text('⏱️ Durée : ${duree.inMinutes} minute(s)', style: const TextStyle(fontSize: 15)),
+            const SizedBox(height: 8),
+            Text('🏋️‍♂️ Tonnage total : ${_tonnageTotalSession.toStringAsFixed(0)} kg', style: const TextStyle(fontSize: 15)),
+            const SizedBox(height: 8),
+            Text('🔥 Meilleur 1RM estimé : ${_meilleur1RMEstime.toStringAsFixed(1)} kg', style: const TextStyle(fontSize: 15)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+            onPressed: () async {
+              List<Map<String, dynamic>> seriesData = series.map((SerieItem s) => {
+                'poids': s.poidsCtrl.text.isEmpty ? '0' : s.poidsCtrl.text,
+                'reps': s.repsCtrl.text.isEmpty ? '0' : s.repsCtrl.text,
+                'rpe': s.rpeCtrl.text,
+                'echec': s.isFailure,
+              }).toList();
+
+              await DatabaseHelper.instance.ajouterSeance({
+                'date': DateTime.now().toString().substring(0, 16),
+                'exercice': _estParCote ? '${widget.exercise.nom} (par côté)' : widget.exercise.nom,
+                'series': seriesData,
+              });
+
+              await _synchroniserAvecHealthConnect(_debutSeance, DateTime.now());
+
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            child: const Text('TERMINER ET SYNCHRONISER'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _startCentralRest(int seconds) {
@@ -134,7 +276,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         ),
         body: TabBarView(
           children: [
-            // ONGLET 1 : Description
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -227,11 +368,40 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                 )),
               ],
             ),
-
-            // ONGLET 2 : Saisir la Séance
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B82F6).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
+                        children: [
+                          const Text('Tonnage Total', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          const SizedBox(height: 4),
+                          Text('${_tonnageTotalSession.toStringAsFixed(0)} kg', 
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
+                        ],
+                      ),
+                      Container(height: 25, width: 1, color: Colors.grey.withOpacity(0.3)),
+                      Column(
+                        children: [
+                          const Text('1RM Estimé max', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          const SizedBox(height: 4),
+                          Text('${_meilleur1RMEstime.toStringAsFixed(1)} kg', 
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -325,6 +495,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                           Expanded(
                             child: TextField(
                               controller: series[i].poidsCtrl,
+                              onChanged: (_) => setState(() {}),
                               decoration: const InputDecoration(labelText: 'Poids', isDense: true, border: OutlineInputBorder()),
                               keyboardType: TextInputType.number,
                             ),
@@ -333,6 +504,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                           Expanded(
                             child: TextField(
                               controller: series[i].repsCtrl,
+                              onChanged: (_) => setState(() {}),
                               decoration: const InputDecoration(labelText: 'Reps', isDense: true, border: OutlineInputBorder()),
                               keyboardType: TextInputType.number,
                             ),
@@ -384,23 +556,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton(
-                  onPressed: () async {
+                  onPressed: () {
                     HapticFeedback.heavyImpact();
-                    List<Map<String, dynamic>> seriesData = series.map((s) => {
-                      'poids': s.poidsCtrl.text.isEmpty ? '0' : s.poidsCtrl.text,
-                      'reps': s.repsCtrl.text.isEmpty ? '0' : s.repsCtrl.text,
-                      'rpe': s.rpeCtrl.text,
-                      'echec': s.isFailure,
-                    }).toList();
-
-                    await DatabaseHelper.instance.ajouterSeance({
-                      'date': DateTime.now().toString().substring(0, 16),
-                      'exercice': _estParCote ? '${widget.exercise.nom} (par côté)' : widget.exercise.nom,
-                      'series': seriesData,
-                    });
-
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Séance enregistrée !')));
-                    Navigator.pop(context);
+                    _afficherRecapitulatifFinDeSeance(context);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
@@ -412,8 +570,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                 )
               ],
             ),
-
-            // ONGLET 3 : Progression
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -503,5 +659,4 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       ),
     );
   }
-}
-     
+} 
