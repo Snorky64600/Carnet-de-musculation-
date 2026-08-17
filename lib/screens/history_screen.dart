@@ -86,12 +86,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         indexCoord++;
       }
 
-      // Mettre en surbrillance la barre maximale en jaune/or comme sur l'image
+            // Mettre en surbrillance la barre maximale en jaune/or comme sur l'image
       if (barRods.isNotEmpty) {
         double maxY = barRods.map((e) => e.toY).reduce((a, b) => a > b ? a : b);
-        for (var rod in barRods) {
-          if (rod.toY == maxY && maxY > 0) {
-            rod.color = Colors.amber; // Couleur Or pour le record
+        for (int i = 0; i < barRods.length; i++) {
+          if (barRods[i].toY == maxY && maxY > 0) {
+            barRods[i] = barRods[i].copyWith(color: Colors.amber); // Utilisation de copyWith
           }
         }
       }
