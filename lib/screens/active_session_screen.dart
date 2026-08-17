@@ -114,8 +114,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     return maxActuelSeance > maxHistorique && maxActuelSeance > 0;
   }
 
-  Future<void> _synchroniserAvecHealthConnect(DateTime debut, DateTime fin) async {
-    final health = HealthFactory(useHealthConnectIfAvailable: true);
+    Future<void> _synchroniserAvecHealthConnect(DateTime debut, DateTime fin) async {
+    final health = Health();
     final types = [HealthDataType.WORKOUT, HealthDataType.ACTIVE_ENERGY_BURNED];
     try {
       bool? hasPermissions = await health.hasPermissions(types);
@@ -125,8 +125,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
           activityType: HealthWorkoutActivityType.STRENGTH_TRAINING,
           start: debut,
           end: fin,
-          totalEnergyBurned: 250,
-          totalEnergyBurnedUnit: WorkoutEnergyUnit.KILOCALORIES,
         );
       }
     } catch (e) {
