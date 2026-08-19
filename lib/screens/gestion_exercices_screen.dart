@@ -4,14 +4,14 @@ import '../helpers/database_helper.dart';
 import '../models/exercise_model.dart';
 import '../widgets/media_widget.dart';
 
-class ExercisesScreen extends StatefulWidget {
-  const ExercisesScreen({Key? key}) : super(key: key);
+class GestionExercicesScreen extends StatefulWidget {
+  const GestionExercicesScreen({Key? key}) : super(key: key);
 
   @override
-  State<ExercisesScreen> createState() => _ExercisesScreenState();
+  State<GestionExercicesScreen> createState() => _GestionExercicesScreenState();
 }
 
-class _ExercisesScreenState extends State<ExercisesScreen> {
+class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
   String _rechercheQuery = '';
 
   @override
