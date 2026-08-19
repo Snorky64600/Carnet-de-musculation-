@@ -24,8 +24,10 @@ jobs:
         channel: 'stable'
         cache: true
 
-    - name: Install Dependencies
-      run: flutter pub get
+        - name: Install Dependencies
+      run: |
+        flutter pub cache repair
+        flutter pub get
 
     - name: Create Clean Build Folder
       run: flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation
@@ -42,6 +44,7 @@ jobs:
     - name: Build APK Release
       run: |
         cd clean_build
+        flutter pub get
         flutter build apk --release
 
     - name: Upload APK
