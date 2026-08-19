@@ -32,11 +32,12 @@ jobs:
     - name: Create Clean Build Folder
       run: flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation
 
-    - name: Copy lib and assets into clean_build
+    - name: Copy lib, assets and pubspec into clean_build
       run: |
         rm -rf clean_build/lib
         cp -r lib clean_build/lib
         if [ -d "assets" ]; then cp -r assets clean_build/assets; fi
+        cp pubspec.yaml clean_build/pubspec.yaml
 
     - name: Run Android Patch Script
       run: python3 patch_android.py
