@@ -116,4 +116,3 @@ class MainActivity: FlutterFragmentActivity() {
       with:
         name: app-release
         path: clean_build/build/app/outputs/flutter-apk/app-release.apk
-        
