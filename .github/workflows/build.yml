@@ -38,7 +38,7 @@ jobs:
 
     - name: Patch Android Project (Kotlin, MinSDK, FragmentActivity & Permissions)
       run: |
-        python3 -c '
+        python3 - << 'EOF'
         import glob
 
         # 1. Met à jour Kotlin dans tous les fichiers Gradle
@@ -73,7 +73,7 @@ class MainActivity: FlutterFragmentActivity() {
 }
 """)
 
-        # 4. Ajoute les permissions et activités Health Connect dans l AndroidManifest.xml
+        # 4. Ajoute les permissions et activités Health Connect dans l'AndroidManifest.xml
         manifest_path = "clean_build/android/app/src/main/AndroidManifest.xml"
         with open(manifest_path, "r") as f:
             m_content = f.read()
@@ -104,7 +104,7 @@ class MainActivity: FlutterFragmentActivity() {
 
         with open(manifest_path, "w") as f:
             f.write(m_content)
-        '
+        EOF
 
     - name: Build APK Release
       run: |
@@ -116,3 +116,4 @@ class MainActivity: FlutterFragmentActivity() {
       with:
         name: app-release
         path: clean_build/build/app/outputs/flutter-apk/app-release.apk
+        
