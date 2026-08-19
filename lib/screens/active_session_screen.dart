@@ -591,8 +591,44 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   label: const Text('ENREGISTRER SANS QUITTER', 
                       style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(height: 12),
+                                const SizedBox(height: 30),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    HapticFeedback.mediumImpact();
+                    List<Map<String, dynamic>> seriesData = series.map((SerieItem s) => {
+                      'poids': s.poidsCtrl.text.isEmpty ? '0' : s.poidsCtrl.text,
+                      'reps': s.repsCtrl.text.isEmpty ? '0' : s.repsCtrl.text,
+                      'rpe': s.rpeCtrl.text,
+                      'echec': s.isFailure,
+                    }).toList();
 
+                    await DatabaseHelper.instance.ajouterSeance({
+                      'date': DateTime.now().toString().substring(0, 16),
+                      'exercice': _estParCote ? '${widget.exercise.nom} (par côté)' : widget.exercise.nom,
+                      'series': seriesData,
+                    });
+
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Progression enregistrée (tu peux continuer) ! 👍'),
+                          duration: Duration(seconds: 2),
+                          backgroundColor: Color(0xFF10B981),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.bookmark_add_outlined, color: Color(0xFF38BDF8)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF38BDF8)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  label: const Text('ENREGISTRER SANS QUITTER', 
+                      style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
                   onPressed: () {
                     HapticFeedback.heavyImpact();
                     _afficherRecapitulatifFinDeSeance(context);
@@ -601,12 +637,11 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                     backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: const Text('TERMINER LA SÉANCE', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                )
-              ],
-            ),
+                ),
+
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
