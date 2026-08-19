@@ -114,7 +114,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     return maxActuelSeance > maxHistorique && maxActuelSeance > 0;
   }
 
-    Future<void> _synchroniserAvecHealthConnect(DateTime debut, DateTime fin) async {
+  Future<void> _synchroniserAvecHealthConnect(DateTime debut, DateTime fin) async {
     final health = Health();
     final types = [HealthDataType.WORKOUT, HealthDataType.ACTIVE_ENERGY_BURNED];
     try {
@@ -199,8 +199,10 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
 
               await _synchroniserAvecHealthConnect(_debutSeance, DateTime.now());
 
-              Navigator.pop(context);
-              Navigator.pop(context);
+              if (context.mounted) {
+                Navigator.pop(context);
+                Navigator.pop(context);
+              }
             },
             child: const Text('TERMINER ET SYNCHRONISER'),
           ),
@@ -262,8 +264,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
           backgroundColor: Colors.transparent,
           bottom: const TabBar(
             isScrollable: true,
-            indicatorColor: Color(0xFF3B82F6),
-            labelColor: Color(0xFF3B82F6),
+            indicatorColor: Color(0xFF38BDF8),
+            labelColor: Color(0xFF38BDF8),
             unselectedLabelColor: Colors.grey,
             tabs: [
               Tab(text: 'Description', icon: Icon(Icons.info_outline)),
@@ -286,7 +288,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                           return LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, isDark ? const Color(0xFF0F1115) : const Color(0xFFF4F6F9)],
+                            colors: [Colors.transparent, isDark ? const Color(0xFF09090B) : const Color(0xFFF4F6F9)],
                             stops: const [0.75, 1.0],
                           ).createShader(rect);
                         },
@@ -295,7 +297,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                           itemCount: widget.exercise.images.length,
                           itemBuilder: (context, index) {
                             return ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
                               child: buildMediaWidget(widget.exercise.images[index], fit: BoxFit.contain),
                             );
                           },
@@ -306,8 +308,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                       right: 8,
                       top: 8,
                       child: FloatingActionButton.small(
-                        backgroundColor: const Color(0xFF3B82F6),
-                        child: const Icon(Icons.add_a_photo, color: Colors.white, size: 18),
+                        backgroundColor: const Color(0xFF38BDF8),
+                        child: const Icon(Icons.add_a_photo, color: Colors.black, size: 18),
                         onPressed: () async {
                           HapticFeedback.lightImpact();
                           final XFile? img = await _picker.pickImage(source: ImageSource.gallery);
@@ -333,9 +335,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF2D3748)),
                     ),
-                    child: Text(tag, style: const TextStyle(color: Color(0xFF3B82F6), fontSize: 13, fontWeight: FontWeight.w500)),
+                    child: Text(tag, style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 13, fontWeight: FontWeight.w500)),
                   )).toList(),
                 ),
                 const SizedBox(height: 24),
@@ -346,8 +347,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF2D3748)),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -373,9 +373,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF3B82F6).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.4)),
+                    color: const Color(0xFF38BDF8).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -385,7 +384,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                           const Text('Tonnage Total', style: TextStyle(fontSize: 11, color: Colors.grey)),
                           const SizedBox(height: 4),
                           Text('${_tonnageTotalSession.toStringAsFixed(0)} kg', 
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8))),
                         ],
                       ),
                       Container(height: 25, width: 1, color: Colors.grey.withOpacity(0.3)),
@@ -404,8 +403,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF2D3748)),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Column(
                     children: [
@@ -423,9 +421,9 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                                 if (index == 2) _dureeRecupChoisie = 300;
                               });
                             },
-                            borderRadius: BorderRadius.circular(8),
-                            selectedColor: Colors.white,
-                            fillColor: const Color(0xFF0D9488),
+                            borderRadius: BorderRadius.circular(12),
+                            selectedColor: Colors.black,
+                            fillColor: const Color(0xFF38BDF8),
                             color: Colors.grey,
                             constraints: const BoxConstraints(minHeight: 32, minWidth: 54),
                             children: const [
@@ -442,7 +440,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                         child: ElevatedButton.icon(
                           onPressed: () => _startCentralRest(_dureeRecupChoisie),
                           icon: const Icon(Icons.timer, size: 18),
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D9488), foregroundColor: Colors.white),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8), foregroundColor: Colors.black),
                           label: Text('Lancer le repos (${_dureeRecupChoisie}s)'),
                         ),
                       ),
@@ -455,19 +453,18 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0D9488).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF0D9488)),
+                      color: const Color(0xFF38BDF8).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: Center(
                       child: Text('Repos en cours : $_currentRest s',
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8))),
                     ),
                   ),
                 CheckboxListTile(
                   title: const Text('Exercice unilatéral (par côté)', style: TextStyle(fontSize: 14, color: Colors.grey)),
                   value: _estParCote,
-                  activeColor: const Color(0xFF3B82F6),
+                  activeColor: const Color(0xFF38BDF8),
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
                   onChanged: (val) {
@@ -481,8 +478,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF2D3748)),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Column(
                     children: [
@@ -544,7 +540,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                     ],
                   ),
                 )),
-                                TextButton.icon(
+                TextButton.icon(
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     setState(() => series.add(SerieItem()));
@@ -582,7 +578,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   icon: const Icon(Icons.bookmark_add_outlined, color: Color(0xFF38BDF8)),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF38BDF8)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   label: const Text('ENREGISTRER SANS QUITTER', 
@@ -602,8 +598,8 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   ),
                   child: const Text('TERMINER LA SÉANCE', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
-
-
+              ],
+            ),
             ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -611,8 +607,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF2D3748)),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -670,13 +665,13 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                                     LineChartBarData(
                                       spots: spots,
                                       isCurved: true,
-                                      color: const Color(0xFF3B82F6),
+                                      color: const Color(0xFF38BDF8),
                                       barWidth: 3,
                                       isStrokeCapRound: true,
                                       dotData: const FlDotData(show: true),
                                       belowBarData: BarAreaData(
                                         show: true,
-                                        color: const Color(0xFF3B82F6).withOpacity(0.15),
+                                        color: const Color(0xFF38BDF8).withOpacity(0.15),
                                       ),
                                     ),
                                   ],
@@ -694,4 +689,3 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     );
   }
 }
-
