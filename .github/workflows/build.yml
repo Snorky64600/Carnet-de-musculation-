@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Flutter APK
 
 on:
   push:
@@ -7,85 +7,112 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-          
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.19.6'
-          channel: 'stable'
-          
-      - name: Build in clean isolated folder
-        run: |
-          flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation --platforms=android
-                    python3 -c '
-          import glob
-          # 1. Met à jour Kotlin dans tous les fichiers Gradle (build.gradle et settings.gradle)
-          for path in glob.glob("clean_build/android/**/*.gradle", recursive=True) + ["clean_build/android/settings.gradle"]:
-              try:
-                  with open(path, "r") as f:
-                      content = f.read()
-                  content = content.replace("1.7.10", "1.9.0")
-                  content = content.replace("1.8.10", "1.9.0")
-                  with open(path, "w") as f:
-                      f.write(content)
-              except Exception:
-                  pass
+    - uses: actions/checkout@v4
 
-          # 2. Force minSdkVersion à 26 pour la compatibilité Health Connect
-          path_app = "clean_build/android/app/build.gradle"
-          with open(path_app, "r") as f:
-              content = f.read()
-          content = content.replace("minSdkVersion 19", "minSdkVersion 26")
-          content = content.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 26")
-          with open(path_app, "w") as f:
-              f.write(content)
-          '
+    - name: Set up Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '17'
 
-                rm -rf clean_build/lib/main.dart
-                cp -r lib/. clean_build/lib/
-                cp pubspec.yaml clean_build/pubspec.yaml
-                mkdir -p clean_build/assets
-                cp logo.png clean_build/assets/logo.png
-                cp upload-keystore.jks clean_build/android/app/upload-keystore.jks
-                cp key.properties clean_build/android/key.properties
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.6'
+        channel: 'stable'
+        cache: true
 
-          
-          python3 -c "
-          path = 'clean_build/android/app/build.gradle'
-          with open(path, 'r') as f:
-              content = f.read()
-          signing = '''android {
-              signingConfigs {
-                  release {
-                      storeFile file('upload-keystore.jks')
-                      storePassword 'password'
-                      keyAlias 'upload'
-                      keyPassword 'password'
-                  }
-              }'''
-          content = content.replace('android {', signing, 1)
-          content = content.replace('signingConfig signingConfigs.debug', 'signingConfig signingConfigs.release')
-          with open(path, 'w') as f:
-              f.write(content)
-          "
-          
-                cd clean_build
-                flutter pub get
-                flutter pub run flutter_launcher_icons:main
-                flutter build apk --release
+    - name: Install Dependencies
+      run: flutter pub get
 
-          
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: clean_build/build/app/outputs/flutter-apk/app-release.apk
-          
+    - name: Create Clean Build Folder
+      run: flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation
+
+    - name: Copy lib and assets into clean_build
+      run: |
+        rm -rf clean_build/lib
+        cp -r lib clean_build/lib
+        if [ -d "assets" ]; then cp -r assets clean_build/assets; fi
+
+    - name: Patch Android Project (Kotlin, MinSDK, FragmentActivity & Permissions)
+      run: |
+        python3 -c '
+        import glob
+
+        # 1. Met à jour Kotlin dans tous les fichiers Gradle
+        for path in glob.glob("clean_build/android/**/*.gradle", recursive=True) + ["clean_build/android/settings.gradle"]:
+            try:
+                with open(path, "r") as f:
+                    content = f.read()
+                content = content.replace("1.7.10", "1.9.0")
+                content = content.replace("1.8.10", "1.9.0")
+                with open(path, "w") as f:
+                    f.write(content)
+            except Exception:
+                pass
+
+        # 2. Force minSdkVersion à 26 pour Health Connect
+        path_app = "clean_build/android/app/build.gradle"
+        with open(path_app, "r") as f:
+            content = f.read()
+        content = content.replace("minSdkVersion 19", "minSdkVersion 26")
+        content = content.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 26")
+        with open(path_app, "w") as f:
+            f.write(content)
+
+        # 3. Remplace MainActivity par FlutterFragmentActivity pour Health Connect
+        for path in glob.glob("clean_build/android/app/src/main/kotlin/**/MainActivity.kt", recursive=True):
+            with open(path, "w") as f:
+                f.write("""package com.cyril.muscu.carnet_musculation;
+
+import io.flutter.embedding.android.FlutterFragmentActivity
+
+class MainActivity: FlutterFragmentActivity() {
+}
+""")
+
+        # 4. Ajoute les permissions et activités Health Connect dans l AndroidManifest.xml
+        manifest_path = "clean_build/android/app/src/main/AndroidManifest.xml"
+        with open(manifest_path, "r") as f:
+            m_content = f.read()
+
+        permissions = """
+            <uses-permission android:name="android.permission.health.READ_EXERCISE"/>
+            <uses-permission android:name="android.permission.health.WRITE_EXERCISE"/>
+            <uses-permission android:name="android.permission.health.READ_ACTIVE_ENERGY_BURNED"/>
+            <uses-permission android:name="android.permission.health.WRITE_ACTIVE_ENERGY_BURNED"/>
+            <queries>
+                <package android:name="com.google.android.apps.healthdata" />
+            </queries>
+        """
+        if "<uses-permission" not in m_content:
+            m_content = m_content.replace("<application", permissions + "\n    <application")
+
+        activity_perm = """
+            <activity
+                android:name="androidx.health.connect.client.PermissionController$Companion$RequestPermissionActivity"
+                android:exported="true">
+                <intent-filter>
+                    <action android:name="androidx.health.connect.client.action.REQUEST_PERMISSIONS" />
+                </intent-filter>
+            </activity>
+        """
+        if "RequestPermissionActivity" not in m_content:
+            m_content = m_content.replace("</application>", activity_perm + "\n    </application>")
+
+        with open(manifest_path, "w") as f:
+            f.write(m_content)
+        '
+
+    - name: Build APK Release
+      run: |
+        cd clean_build
+        flutter build apk --release
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: app-release
+        path: clean_build/build/app/outputs/flutter-apk/app-release.apk
