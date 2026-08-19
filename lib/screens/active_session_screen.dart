@@ -544,54 +544,15 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                     ],
                   ),
                 )),
-                TextButton.icon(
+                                TextButton.icon(
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     setState(() => series.add(SerieItem()));
                   },
-                  icon: const Icon(Icons.add, color: Color(0xFF3B82F6)),
-                  label: const Text('Ajouter une série', style: TextStyle(color: Color(0xFF3B82F6))),
+                  icon: const Icon(Icons.add, color: Color(0xFF38BDF8)),
+                  label: const Text('Ajouter une série', style: TextStyle(color: Color(0xFF38BDF8))),
                 ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                                  const SizedBox(height: 16),
-                // Bouton pour sauvegarder en cours de route sans quitter l'écran
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    HapticFeedback.mediumImpact();
-                    List<Map<String, dynamic>> seriesData = series.map((SerieItem s) => {
-                      'poids': s.poidsCtrl.text.isEmpty ? '0' : s.poidsCtrl.text,
-                      'reps': s.repsCtrl.text.isEmpty ? '0' : s.repsCtrl.text,
-                      'rpe': s.rpeCtrl.text,
-                      'echec': s.isFailure,
-                    }).toList();
-
-                    // Enregistrement dans l'historique sans faire de pop()
-                    await DatabaseHelper.instance.ajouterSeance({
-                      'date': DateTime.now().toString().substring(0, 16),
-                      'exercice': _estParCote ? '${widget.exercise.nom} (par côté)' : widget.exercise.nom,
-                      'series': seriesData,
-                    });
-
-                    // Notification visuelle discrète
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Progression enregistrée (tu peux continuer) ! 👍'),
-                        duration: Duration(seconds: 2),
-                        backgroundColor: Color(0xFF10B981),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.bookmark_add_outlined, color: Color(0xFF38BDF8)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF38BDF8)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  label: const Text('ENREGISTRER SANS QUITTER', 
-                      style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
-                ),
-                                const SizedBox(height: 30),
+                const SizedBox(height: 20),
                 OutlinedButton.icon(
                   onPressed: () async {
                     HapticFeedback.mediumImpact();
@@ -641,6 +602,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
                   ),
                   child: const Text('TERMINER LA SÉANCE', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
+
 
             ListView(
               padding: const EdgeInsets.all(16),
