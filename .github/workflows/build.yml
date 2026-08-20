@@ -37,7 +37,6 @@ jobs:
         if [ -d "assets" ]; then cp -r assets clean_build/assets; fi
         cp pubspec.yaml clean_build/pubspec.yaml
         
-        # Copie de la signature aux bons endroits pour éviter le conflit "App non installée"
         if [ -f "key.properties" ]; then 
           cp key.properties clean_build/android/
           cp key.properties clean_build/android/app/
