@@ -30,28 +30,30 @@ jobs:
     - name: Create Clean Build Folder
       run: flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation
 
-    - name: Copy project files and signature into clean_build
+    - name: Copy project files, signature and logo into clean_build
       run: |
         rm -rf clean_build/lib
         cp -r lib clean_build/lib
         if [ -d "assets" ]; then cp -r assets clean_build/assets; fi
         cp pubspec.yaml clean_build/pubspec.yaml
         
-        # Copie propre des clés de signature aux emplacements natifs Flutter
-        if [ -f "key.properties" ]; then 
-          cp key.properties clean_build/android/
-        fi
-        if [ -f "upload-keystore.jks" ]; then 
-          cp upload-keystore.jks clean_build/android/app/
-        fi
+        # Copie du logo et des clés de signature
+        if [ -f "logo.png" ]; then cp logo.png clean_build/; fi
+        if [ -f "key.properties" ]; then cp key.properties clean_build/android/; fi
+        if [ -f "upload-keystore.jks" ]; then cp upload-keystore.jks clean_build/android/app/; fi
 
     - name: Run Android Patch Script
       run: python3 patch_android.py
 
-    - name: Build APK Release
+    - name: Generate Custom Launcher Icons
       run: |
         cd clean_build
         flutter pub get
+        flutter pub run flutter_launcher_icons
+
+    - name: Build APK Release
+      run: |
+        cd clean_build
         flutter build apk --release
 
     - name: Upload APK
@@ -59,4 +61,3 @@ jobs:
       with:
         name: app-release
         path: clean_build/build/app/outputs/flutter-apk/app-release.apk
-        
