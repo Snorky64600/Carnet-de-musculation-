@@ -1,58 +1,58 @@
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localProperties.load(new FileInputStream(localPropertiesFile))
-}
+name: Build Flutter APK
 
-def flutterRoot = localProperties.getProperty('flutter.sdk')
-if (flutterRoot == null) {
-    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
-}
+on:
+  push:
+    branches: [ main ]
 
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
-if (flutterVersionCode == null) {
-    flutterVersionCode = '1'
-}
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-def flutterVersionName = localProperties.getProperty('flutter.versionName')
-if (flutterVersionName == null) {
-    flutterVersionName = '1.0'
-}
+    steps:
+    - uses: actions/checkout@v4
 
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
+    - name: Set up Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '17'
 
-android {
-    compileSdkVersion flutter.compileSdkVersion
-    
-    signingConfigs {
-        release {
-            def keystoreProperties = new Properties()
-            def keystorePropertiesFile = rootProject.file('key.properties')
-            if (keystorePropertiesFile.exists()) {
-                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-            }
-            storeFile file('upload-keystore.jks')
-            storePassword keystoreProperties['storePassword']
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
-        }
-    }
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.6'
+        channel: 'stable'
+        cache: true
 
-    defaultConfig {
-        applicationId "com.cyril.muscu"
-        minSdkVersion flutter.minSdkVersion
-        targetSdkVersion flutter.targetSdkVersion
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
-    }
+    - name: Install Dependencies
+      run: flutter pub get
 
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release
-            minifyEnabled false
-            shrinkResources false
-        }
-    }
-}
+    - name: Create Clean Build Folder
+      run: flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation
+
+    - name: Copy project files, signature and custom build.gradle into clean_build
+      run: |
+        rm -rf clean_build/lib
+        cp -r lib clean_build/lib
+        if [ -d "assets" ]; then cp -r assets clean_build/assets; fi
+        cp pubspec.yaml clean_build/pubspec.yaml
+        
+        # Copie les fichiers de signature et remplace le build.gradle par ton fichier personnalisé
+        if [ -f "key.properties" ]; then cp key.properties clean_build/android/; fi
+        if [ -f "upload-keystore.jks" ]; then cp upload-keystore.jks clean_build/android/app/; fi
+        if [ -f "custom_build.gradle" ]; then cp custom_build.gradle clean_build/android/app/build.gradle; fi
+
+    - name: Run Android Patch Script
+      run: python3 patch_android.py
+
+    - name: Build APK Release
+      run: |
+        cd clean_build
+        flutter pub get
+        flutter build apk --release
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release
+        path: clean_build/build/app/outputs/flutter-apk/app-release.apk
