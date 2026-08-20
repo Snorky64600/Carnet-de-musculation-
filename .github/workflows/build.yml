@@ -37,10 +37,17 @@ jobs:
         if [ -d "assets" ]; then cp -r assets clean_build/assets; fi
         cp pubspec.yaml clean_build/pubspec.yaml
         
-        # Copie les fichiers de signature et remplace le build.gradle par ton fichier personnalisé
-        if [ -f "key.properties" ]; then cp key.properties clean_build/android/; fi
-        if [ -f "upload-keystore.jks" ]; then cp upload-keystore.jks clean_build/android/app/; fi
-        if [ -f "custom_build.gradle" ]; then cp custom_build.gradle clean_build/android/app/build.gradle; fi
+        # Copie de la signature aux bons endroits pour éviter le conflit "App non installée"
+        if [ -f "key.properties" ]; then 
+          cp key.properties clean_build/android/
+          cp key.properties clean_build/android/app/
+        fi
+        if [ -f "upload-keystore.jks" ]; then 
+          cp upload-keystore.jks clean_build/android/app/
+        fi
+        if [ -f "custom_build.gradle" ]; then 
+          cp custom_build.gradle clean_build/android/app/build.gradle
+        fi
 
     - name: Run Android Patch Script
       run: python3 patch_android.py
@@ -56,3 +63,4 @@ jobs:
       with:
         name: app-release
         path: clean_build/build/app/outputs/flutter-apk/app-release.apk
+        
