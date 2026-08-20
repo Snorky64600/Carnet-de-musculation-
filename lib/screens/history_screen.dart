@@ -11,6 +11,7 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   String filtreExercice = 'Tous les exercices';
+  String _searchQuery = '';
 
   String _nettoyerNom(String nomExercice) {
     return nomExercice.replaceAll(' (par côté)', '').trim();
@@ -25,15 +26,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final toutesLesSessions = DatabaseHelper.instance.sessionsSauvegardees;
     
+    // Filtrage combiné par recherche textuelle et par exercice sélectionné
     final sessionsFiltreesAvecIndex = <MapEntry<int, Map<String, dynamic>>>[];
     for (int i = 0; i < toutesLesSessions.length; i++) {
-      if (filtreExercice == 'Tous les exercices' || 
-          _nettoyerNom(toutesLesSessions[i]['exercice']) == _nettoyerNom(filtreExercice)) {
-        sessionsFiltreesAvecIndex.add(MapEntry(i, toutesLesSessions[i]));
+      final s = toutesLesSessions[i];
+      final nomExo = s['exercice']?.toString() ?? '';
+      
+      bool matchFiltre = filtreExercice == 'Tous les exercices' || 
+          _nettoyerNom(nomExo) == _nettoyerNom(filtreExercice);
+          
+      bool matchRecherche = _searchQuery.isEmpty || 
+          nomExo.toLowerCase().contains(_searchQuery.toLowerCase());
+
+      if (matchFiltre && matchRecherche) {
+        sessionsFiltreesAvecIndex.add(MapEntry(i, s));
       }
     }
 
-    // Calculs des métriques globales pour l'exercice sélectionné
     double maxPoidsGlobal = 0;
     double meilleur1RMGlobal = 0;
     double maxVolumeGlobal = 0;
@@ -41,8 +50,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     List<String> datesLabels = [];
 
     if (filtreExercice != 'Tous les exercices') {
-      int indexCoord = 0;
-      // On parcourt chronologiquement pour le graphique
       final sessionsChronologiques = sessionsFiltreesAvecIndex.reversed.toList();
       for (var item in sessionsChronologiques) {
         final s = item.value;
@@ -59,7 +66,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
           if (p > maxPoidsSession) maxPoidsSession = p;
           if (p > maxPoidsGlobal) maxPoidsGlobal = p;
 
-          // Calcul 1RM Epley par série
           if (p > 0 && r > 0) {
             double epley = p * (1 + r / 30.0);
             if (epley > max1RMSession) max1RMSession = epley;
@@ -72,26 +78,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
           maxVolumeGlobal = volumeSession;
         }
 
-        // On prépare les barres du graphique
-        bool estLeMax = false; // Sera affiné par la suite si c'est le pic
         barRods.add(
           BarChartRodData(
             toY: max1RMSession > 0 ? max1RMSession : maxPoidsSession,
-            color: const Color(0xFF3B82F6),
+            color: const Color(0xFF38BDF8),
             width: 14,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
           ),
         );
         datesLabels.add(s['date'].toString().substring(5, 10));
-        indexCoord++;
       }
 
-            // Mettre en surbrillance la barre maximale en jaune/or comme sur l'image
       if (barRods.isNotEmpty) {
         double maxY = barRods.map((e) => e.toY).reduce((a, b) => a > b ? a : b);
         for (int i = 0; i < barRods.length; i++) {
           if (barRods[i].toY == maxY && maxY > 0) {
-            barRods[i] = barRods[i].copyWith(color: Colors.amber); // Utilisation de copyWith
+            barRods[i] = barRods[i].copyWith(color: Colors.amber);
           }
         }
       }
@@ -101,16 +103,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(title: const Text('Historique & Progression'), backgroundColor: Colors.transparent),
       body: Column(
         children: [
+          // Barre de recherche textuelle
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextField(
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Rechercher dans l\'historique...',
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF38BDF8)),
+                filled: true,
+                fillColor: Theme.of(context).cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          // Menu déroulant de filtre par exercice
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: DropdownButtonFormField<String>(
               value: optionsFiltre.contains(filtreExercice) ? filtreExercice : 'Tous les exercices',
               dropdownColor: Theme.of(context).cardColor,
               isExpanded: true,
               decoration: InputDecoration(
                 labelText: 'Filtrer par exercice',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                filled: true,
+                fillColor: Theme.of(context).cardColor,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               items: optionsFiltre.map((String nom) {
                 return DropdownMenuItem<String>(
@@ -127,7 +149,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
           if (filtreExercice != 'Tous les exercices') ...[
-            // Encart des 3 indicateurs clés (Meilleur 1RM, Poids Max, Volume Max)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
@@ -136,15 +157,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF3B82F6),
-                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFF38BDF8),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('MEILLEUR 1RM', style: TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold)),
+                          const Text('MEILLEUR 1RM', style: TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text('${meilleur1RMGlobal.toStringAsFixed(1)} kg', style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                          Text('${meilleur1RMGlobal.toStringAsFixed(1)} kg', style: const TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -155,8 +176,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF2D3748)),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,8 +194,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF2D3748)),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,14 +209,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ],
               ),
             ),
-            // Graphique en barres (BarChart)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2D3748)),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,19 +263,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ],
           Expanded(
             child: sessionsFiltreesAvecIndex.isEmpty
-                ? const Center(child: Text('Aucune séance enregistrée pour cet exercice', style: TextStyle(color: Colors.grey)))
+                ? const Center(child: Text('Aucune séance enregistrée', style: TextStyle(color: Colors.grey)))
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: sessionsFiltreesAvecIndex.length,
                     itemBuilder: (context, index) {
-                      final itemReel = sessionsFiltreesAvecIndex[index]; // Ordre antéchronologique (plus récent en haut)
+                      final itemReel = sessionsFiltreesAvecIndex[index];
                       final int indexGlobal = itemReel.key;
                       final s = itemReel.value;
                       final List seriesList = s['series'] ?? [];
                       final String nomExoBrut = s['exercice'];
                       final String nomExoNettoye = _nettoyerNom(nomExoBrut);
 
-                      // Vérification si cette séance contient le poids max ou un 1RM remarquable
                       bool estPoidsMaxSeance = false;
                       for (var serie in seriesList) {
                         double p = double.tryParse(serie['poids'].toString()) ?? 0;
@@ -280,11 +296,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
                             color: Theme.of(context).cardColor,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF2D3748)),
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.all(14),
+                            padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -293,7 +308,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   children: [
                                     Expanded(
                                       child: Text(nomExoBrut,
-                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
+                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8))),
                                     ),
                                     Text(s['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
                                     const SizedBox(width: 8),
@@ -307,7 +322,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     ),
                                   ],
                                 ),
-                                const Divider(color: Color(0xFF2D3748), height: 16),
+                                const Divider(color: Colors.white12, height: 16),
                                 ...List.generate(seriesList.length, (i) {
                                   final serie = seriesList[i];
                                   final p = serie['poids']?.toString() ?? '0';
@@ -315,7 +330,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   final rpe = serie['rpe']?.toString() ?? '';
                                   final isEchec = serie['echec'] == true || serie['echec'] == 'true';
                                   
-                                  // Calcul 1RM individuel pour la ligne
                                   double pVal = double.tryParse(p) ?? 0;
                                   double rVal = double.tryParse(r) ?? 0;
                                   double rmSerie = pVal > 0 && rVal > 0 ? pVal * (1 + rVal / 30.0) : 0;
@@ -326,7 +340,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   if (rmSerie > 0) details += '  •  1RM: ${rmSerie.toStringAsFixed(1)}';
 
                                   return Padding(
-                                    padding: const EdgeInsets.only(bottom: 6),
+                                    padding: const EdgeInsets.only(bottom: 4),
                                     child: Text(details, style: const TextStyle(fontSize: 13, color: Colors.white70)),
                                   );
                                 }),
@@ -338,7 +352,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: Colors.red.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius: BorderRadius.circular(8),
                                           border: Border.all(color: Colors.redAccent),
                                         ),
                                         child: const Text('POIDS MAX 🔴', style: TextStyle(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.bold)),
