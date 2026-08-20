@@ -37,8 +37,14 @@ jobs:
         if [ -d "assets" ]; then cp -r assets clean_build/assets; fi
         cp pubspec.yaml clean_build/pubspec.yaml
         
-        # Copie du logo et des clés de signature
-        if [ -f "logo.png" ]; then cp logo.png clean_build/; fi
+        # Crée le dossier assets si besoin et y place le logo pour le générateur d'icônes
+        mkdir -p clean_build/assets
+        if [ -f "logo.png" ]; then 
+          cp logo.png clean_build/
+          cp logo.png clean_build/assets/logo.png
+        fi
+        
+        # Copie des clés de signature
         if [ -f "key.properties" ]; then cp key.properties clean_build/android/; fi
         if [ -f "upload-keystore.jks" ]; then cp upload-keystore.jks clean_build/android/app/; fi
 
@@ -61,3 +67,4 @@ jobs:
       with:
         name: app-release
         path: clean_build/build/app/outputs/flutter-apk/app-release.apk
+        
