@@ -30,22 +30,19 @@ jobs:
     - name: Create Clean Build Folder
       run: flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation
 
-    - name: Copy project files, signature and custom build.gradle into clean_build
+    - name: Copy project files and signature into clean_build
       run: |
         rm -rf clean_build/lib
         cp -r lib clean_build/lib
         if [ -d "assets" ]; then cp -r assets clean_build/assets; fi
         cp pubspec.yaml clean_build/pubspec.yaml
         
+        # Copie propre des clés de signature aux emplacements natifs Flutter
         if [ -f "key.properties" ]; then 
           cp key.properties clean_build/android/
-          cp key.properties clean_build/android/app/
         fi
         if [ -f "upload-keystore.jks" ]; then 
           cp upload-keystore.jks clean_build/android/app/
-        fi
-        if [ -f "custom_build.gradle" ]; then 
-          cp custom_build.gradle clean_build/android/app/build.gradle
         fi
 
     - name: Run Android Patch Script
