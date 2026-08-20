@@ -25,14 +25,12 @@ jobs:
         cache: true
 
     - name: Install Dependencies
-      run: |
-        flutter pub cache repair
-        flutter pub get
+      run: flutter pub get
 
     - name: Create Clean Build Folder
       run: flutter create clean_build --org com.cyril.muscu --project-name carnet_musculation
 
-    - name: Copy lib, assets and pubspec into clean_build
+    - name: Copy project files into clean_build
       run: |
         rm -rf clean_build/lib
         cp -r lib clean_build/lib
