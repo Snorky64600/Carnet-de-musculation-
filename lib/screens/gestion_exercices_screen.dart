@@ -16,7 +16,6 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Filtrer la liste des exercices selon la recherche
     final exercicesFiltres = DatabaseHelper.instance.exercicesDisponibles.where((exo) {
       return exo.nom.toLowerCase().contains(_rechercheQuery.toLowerCase());
     }).toList();
@@ -28,7 +27,6 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
       ),
       body: Column(
         children: [
-          // Barre de recherche moderne
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -84,7 +82,6 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                           trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                           onTap: () {
                             HapticFeedback.selectionClick();
-                            // Tu peux ajouter ici une action si tu souhaites modifier l'exercice par la suite
                           },
                         ),
                       );
