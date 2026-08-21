@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import '../helpers/database_helper.dart';
 import '../models/exercise_model.dart';
 import '../widgets/media_widget.dart';
@@ -13,6 +14,7 @@ class GestionExercicesScreen extends StatefulWidget {
 
 class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
   String _rechercheQuery = '';
+  bool _triAlphabetique = false;
 
   void _ouvrirFormulaireComplet({ExerciseModel? exerciceExistant}) {
     Navigator.push(
@@ -25,14 +27,24 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final exercicesFiltres = DatabaseHelper.instance.exercicesDisponibles.where((exo) {
+    var exercicesFiltres = DatabaseHelper.instance.exercicesDisponibles.where((exo) {
       return exo.nom.toLowerCase().contains(_rechercheQuery.toLowerCase());
     }).toList();
+
+    if (_triAlphabetique) {
+      exercicesFiltres.sort((a, b) => a.nom.compareTo(b.nom));
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gérer les exercices'),
-        backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            icon: Icon(_triAlphabetique ? Icons.sort_by_alpha : Icons.sort),
+            tooltip: 'Tri alphabétique',
+            onPressed: () => setState(() => _triAlphabetique = !_triAlphabetique),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -45,18 +57,13 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                 prefixIcon: const Icon(Icons.search, color: Color(0xFF38BDF8)),
                 filled: true,
                 fillColor: Theme.of(context).cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
               ),
             ),
           ),
           Expanded(
             child: exercicesFiltres.isEmpty
-                ? const Center(
-                    child: Text('Aucun exercice trouvé', style: TextStyle(color: Colors.grey)),
-                  )
+                ? const Center(child: Text('Aucun exercice trouvé', style: TextStyle(color: Colors.grey)))
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: exercicesFiltres.length,
@@ -64,10 +71,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                       final exo = exercicesFiltres[index];
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
+                        decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20)),
                         child: ListTile(
                           contentPadding: const EdgeInsets.all(12),
                           leading: ClipRRect(
@@ -77,17 +81,11 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                               height: 50,
                               child: exo.images.isNotEmpty
                                   ? buildMediaWidget(exo.images.first, fit: BoxFit.cover)
-                                  : Container(
-                                      color: Colors.grey[800],
-                                      child: const Icon(Icons.fitness_center, color: Colors.white70),
-                                    ),
+                                  : Container(color: Colors.grey[800], child: const Icon(Icons.fitness_center, color: Colors.white70)),
                             ),
                           ),
                           title: Text(exo.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(
-                            exo.tags.join(', '),
-                            style: const TextStyle(color: Colors.grey, fontSize: 12),
-                          ),
+                          subtitle: Text(exo.tags.join(', '), style: const TextStyle(color: Colors.grey, fontSize: 12)),
                           trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                           onTap: () {
                             HapticFeedback.selectionClick();
@@ -112,7 +110,6 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
   }
 }
 
-// --- PAGE DE FORMULAIRE COMPLET (IMAGES, TAGS, ETAPES) ---
 class FormulaireExercicePage extends StatefulWidget {
   final ExerciseModel? exerciceExistant;
   const FormulaireExercicePage({Key? key, this.exerciceExistant}) : super(key: key);
@@ -124,7 +121,7 @@ class FormulaireExercicePage extends StatefulWidget {
 class _FormulaireExercicePageState extends State<FormulaireExercicePage> {
   late TextEditingController _nomController;
   late TextEditingController _tagsController;
-  late List<TextEditingController> _imageControllers;
+  late List<String> _images;
   late List<TextEditingController> _stepControllers;
 
   @override
@@ -132,87 +129,70 @@ class _FormulaireExercicePageState extends State<FormulaireExercicePage> {
     super.initState();
     _nomController = TextEditingController(text: widget.exerciceExistant?.nom ?? '');
     _tagsController = TextEditingController(text: widget.exerciceExistant?.tags.join(', ') ?? '');
-    
-    _imageControllers = widget.exerciceExistant?.images.isNotEmpty == true
-        ? widget.exerciceExistant!.images.map((img) => TextEditingController(text: img)).toList()
-        : [TextEditingController()];
-
+    _images = List.from(widget.exerciceExistant?.images ?? []);
     _stepControllers = widget.exerciceExistant?.steps.isNotEmpty == true
-        ? widget.exerciceExistant!.steps.map((step) => TextEditingController(text: step)).toList()
+        ? widget.exerciceExistant!.steps.map((s) => TextEditingController(text: s)).toList()
         : [TextEditingController()];
+  }
+
+  Future<void> _importerImageGalerie() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _images.add(pickedFile.path);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     bool isEditing = widget.exerciceExistant != null;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? 'Modifier l\'exercice' : 'Nouvel exercice'),
-      ),
+      appBar: AppBar(title: Text(isEditing ? 'Modifier l\'exercice' : 'Nouvel exercice')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          TextField(
-            controller: _nomController,
-            decoration: const InputDecoration(labelText: 'Nom de l\'exercice', border: OutlineInputBorder()),
-          ),
+          TextField(controller: _nomController, decoration: const InputDecoration(labelText: 'Nom de l\'exercice', border: OutlineInputBorder())),
           const SizedBox(height: 16),
-          TextField(
-            controller: _tagsController,
-            decoration: const InputDecoration(labelText: 'Tags (séparés par des virgules ex: Dos, Force)', border: OutlineInputBorder()),
-          ),
+          TextField(controller: _tagsController, decoration: const InputDecoration(labelText: 'Tags (séparés par virgules)', border: OutlineInputBorder())),
           const SizedBox(height: 24),
-          const Text('Images / GIFs (URLs)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blueAccent)),
+          const Text('Photos / GIFs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blueAccent)),
           const SizedBox(height: 8),
-          ..._imageControllers.asMap().entries.map((entry) {
-            int index = entry.key;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: entry.value,
-                      decoration: InputDecoration(labelText: 'URL Image ${index + 1}', border: const OutlineInputBorder()),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => setState(() => _imageControllers.removeAt(index)),
-                  ),
-                ],
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ..._images.map((img) => Stack(
+                    children: [
+                      ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(width: 80, height: 80, child: buildMediaWidget(img, fit: BoxFit.cover))),
+                      Positioned(
+                        right: 0, top: 0,
+                        child: IconButton(
+                          icon: const Icon(Icons.remove_circle, color: Colors.red),
+                          onPressed: () => setState(() => _images.remove(img)),
+                        ),
+                      )
+                    ],
+                  )),
+              ActionChip(
+                avatar: const Icon(Icons.add_a_photo),
+                label: const Text('Galerie'),
+                onPressed: _importerImageGalerie,
               ),
-            );
-          }),
-          ElevatedButton.icon(
-            onPressed: () => setState(() => _imageControllers.add(TextEditingController())),
-            icon: const Icon(Icons.add),
-            label: const Text('Ajouter une image'),
+            ],
           ),
           const SizedBox(height: 24),
           const Text('Étapes d\'exécution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blueAccent)),
-          const SizedBox(height: 8),
-          ..._stepControllers.asMap().entries.map((entry) {
-            int index = entry.key;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: entry.value,
-                      decoration: InputDecoration(labelText: 'Étape ${index + 1}', border: const OutlineInputBorder()),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => setState(() => _stepControllers.removeAt(index)),
-                  ),
-                ],
-              ),
-            );
-          }),
+          ..._stepControllers.asMap().entries.map((entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  children: [
+                    Expanded(child: TextField(controller: entry.value, decoration: InputDecoration(labelText: 'Étape ${entry.key + 1}', border: const OutlineInputBorder()))),
+                    IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => setState(() => _stepControllers.removeAt(entry.key))),
+                  ],
+                ),
+              )),
           ElevatedButton.icon(
             onPressed: () => setState(() => _stepControllers.add(TextEditingController())),
             icon: const Icon(Icons.add),
@@ -224,22 +204,19 @@ class _FormulaireExercicePageState extends State<FormulaireExercicePage> {
             onPressed: () async {
               String nom = _nomController.text.trim();
               List<String> tags = _tagsController.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-              List<String> images = _imageControllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
               List<String> steps = _stepControllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
 
               if (nom.isNotEmpty) {
-                ExerciseModel nouvelExo = ExerciseModel(nom: nom, tags: tags, images: images, steps: steps);
-
+                ExerciseModel exo = ExerciseModel(nom: nom, tags: tags, images: _images, steps: steps);
                 if (!isEditing) {
-                  await DatabaseHelper.instance.ajouterExerciceComplet(nouvelExo);
+                  await DatabaseHelper.instance.ajouterExerciceComplet(exo);
                 } else {
-                  await DatabaseHelper.instance.modifierExerciceComplet(widget.exerciceExistant!.nom, nouvelExo);
+                  await DatabaseHelper.instance.modifierExerciceComplet(widget.exerciceExistant!.nom, exo);
                 }
-
                 Navigator.pop(context);
               }
             },
-            child: const Text('Enregistrer l\'exercice', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            child: const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
