@@ -14,6 +14,63 @@ class GestionExercicesScreen extends StatefulWidget {
 class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
   String _rechercheQuery = '';
 
+  void _ouvrirFormulaireExercice({ExerciseModel? exerciceExistant}) {
+    final nomController = TextEditingController(text: exerciceExistant?.nom ?? '');
+    final tagsController = TextEditingController(text: exerciceExistant?.tags.join(', ') ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        title: Text(exerciceExistant == null ? 'Ajouter un exercice' : 'Modifier l\'exercice'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nomController,
+              decoration: const InputDecoration(labelText: 'Nom de l\'exercice'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: tagsController,
+              decoration: const InputDecoration(labelText: 'Tags (séparés par des virgules)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              String nom = nomController.text.trim();
+              List<String> tags = tagsController.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+
+              if (nom.isNotEmpty) {
+                if (exerciceExistant == null) {
+                  // Ajout d'un nouvel exercice
+                  await DatabaseHelper.instance.ajouterExerciceComplet(
+                    ExerciseModel(nom: nom, tags: tags, images: []),
+                  );
+                } else {
+                  // Modification de l'exercice existant
+                  await DatabaseHelper.instance.modifierExerciceComplet(
+                    exerciceExistant.nom,
+                    ExerciseModel(nom: nom, tags: tags, images: exerciceExistant.images, steps: exerciceExistant.steps),
+                  );
+                }
+                setState(() {});
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final exercicesFiltres = DatabaseHelper.instance.exercicesDisponibles.where((exo) {
@@ -82,6 +139,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                           trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                           onTap: () {
                             HapticFeedback.selectionClick();
+                            _ouvrirFormulaireExercice(exerciceExistant: exo);
                           },
                         ),
                       );
@@ -89,6 +147,14 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                   ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.blueAccent,
+        onPressed: () {
+          HapticFeedback.mediumImpact();
+          _ouvrirFormulaireExercice();
+        },
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
