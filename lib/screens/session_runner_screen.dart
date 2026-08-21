@@ -27,7 +27,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   int? _tempsRestant;
   Timer? _chronoTimer;
 
-  @opentype
   @override
   void dispose() {
     _chronoTimer?.cancel();
@@ -56,7 +55,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     _chronoTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_tempsRestant != null && _tempsRestant! > 0) {
         setState(() {
-          _tempsRestant--;
+          _tempsRestant = _tempsRestant! - 1; // Correction null-safety
         });
       } else {
         _chronoTimer?.cancel();
@@ -89,7 +88,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                 _buildChronoChip("90 sec", 90),
                 _buildChronoChip("3 min", 180),
                 _buildChronoChip("5 min", 300),
-                _buildChronoChip("Libre (Stopwatch)", -1),
+                _buildChronoChip("Libre", 9999),
               ],
             ),
           ],
@@ -98,18 +97,13 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     );
   }
 
-  Widget _buildChip(String label, int secondes) {
+  Widget _buildChronoChip(String label, int secondes) {
     return ActionChip(
       backgroundColor: Colors.white.withOpacity(0.08),
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
       onPressed: () {
         Navigator.pop(context);
-        if (secondes > 0) {
-          _lancerChrono(secondes);
-        } else {
-          // Chrono libre (compte à rebours infini ou simple affichage)
-          _lancerChrono(9999);
-        }
+        _lancerChrono(secondes);
       },
     );
   }
@@ -174,9 +168,9 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       ),
       body: PageView(
         controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(), // Bloque le swipe manuel pour forcer le bouton
+        physics: const NeverScrollableScrollPhysics(),
         children: [
-          // PAGE 1 : Photo & Description (Glossy)
+          // PAGE 1 : Photo & Description
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -230,7 +224,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
             ),
           ),
 
-          // PAGE 2 : Enregistrement des Séries (Style Tableau Glossy)
+          // PAGE 2 : Enregistrement des Séries
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -314,17 +308,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildChronoChip(String label, int secondes) {
-    return ActionChip(
-      backgroundColor: Colors.white.withOpacity(0.08),
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-      onPressed: () {
-        Navigator.pop(context);
-        _lancerChrono(secondes);
-      },
     );
   }
 }
