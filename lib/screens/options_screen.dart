@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../main.dart';
 import '../helpers/database_helper.dart';
 
 class OptionsScreen extends StatefulWidget {
@@ -34,7 +31,8 @@ class _OptionsScreenState extends State<OptionsScreen> {
             leading: const Icon(Icons.upload_file),
             title: const Text('Exporter vers CSV'),
             onTap: () async {
-              String csvData = DatabaseHelper.instance.exporterEnCsv();
+              // Correction ici : 'instance' avec un 'i' minuscule
+              String csvData = await DatabaseHelper.instance.exportercsv();
               await Share.share(csvData, subject: 'Mon Historique Entraînement');
             },
           ),
@@ -44,17 +42,9 @@ class _OptionsScreenState extends State<OptionsScreen> {
             onTap: () async {
               FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
               if (result != null) {
-                // Logic d'import simple via le contenu du fichier
-                // (Note : nécessite dart:io pour lire le fichier local)
+                // Logique d'import ici
               }
             },
-          ),
-          const Divider(),
-          const Text('Apparence', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-          SwitchListTile(
-            title: const Text('Mode Sombre'),
-            value: themeNotifier.value == ThemeMode.dark,
-            onChanged: (val) => themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light,
           ),
         ],
       ),
