@@ -85,10 +85,20 @@ class _HomeScreenState extends State<HomeScreen> {
     if (requested) {
       final now = DateTime.now();
       final midnight = DateTime(now.year, now.month, now.day);
-      List<HealthDataPoint> data = await health.getHealthDataFromTypes(midnight, now, types);
+      
+      // Correction de la syntaxe Health (paramètres nommés)
+      List<HealthDataPoint> data = await health.getHealthDataFromTypes(
+        types: types,
+        startTime: midnight,
+        endTime: now,
+      );
+      
       if (data.isNotEmpty) {
         setState(() {
-          _bpm = data.last.value.toInt();
+          final value = data.last.value;
+          if (value is NumericHealthValue) {
+            _bpm = value.numericValue.toInt();
+          }
         });
       }
     }
@@ -135,7 +145,6 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 20),
           const Text("Historique des séances", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          // Liste historique avec tri chronologique / alphabétique possible
           ...DatabaseHelper.instance.sessionsSauvegardees.map((session) => Card(
                 child: ListTile(
                   title: Text(session['exercice'] ?? 'Séance'),
@@ -160,10 +169,11 @@ class StatsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Écran de stats temporaire en attendant les graphiques
     return Scaffold(
       appBar: AppBar(title: const Text("Statistiques & Progression")),
       body: const Center(
-        child: Text("Graphiques 1RM et Volumes (Fl_chart)", style: TextStyle(color: Colors.grey)),
+        child: Text("Graphiques de progression", style: TextStyle(color: Colors.grey)),
       ),
     );
   }
