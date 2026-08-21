@@ -1,61 +1,57 @@
 import 'package:flutter/material.dart';
-import 'helpers/database_helper.dart';
+import 'helpers/database_helper.dart'; // Import crucial
 import 'screens/home_screen.dart';
-
-ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await DatabaseHelper.instance.chargerDonnees();
-  runApp(const CornelMusculationApp());
+  await DatabaseHelper.Instance.chargardonnees(); // Garde cette ligne absolument !
+  runApp(CarnetMuscuApp());
 }
 
-class CornelMusculationApp extends StatelessWidget {
-  const CornelMusculationApp({Key? key}) : super(key: key);
+class CarnetMuscuApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark().copyWith(
+        primaryColor: Colors.blueAccent,
+        scaffoldBackgroundColor: Colors.grey[900],
+        cardColor: Colors.grey[850],
+        appBarTheme: AppBarTheme(backgroundColor: Colors.grey[900]),
+      ),
+      home: MainNavigation(),
+    );
+  }
+}
+
+class MainNavigation extends StatefulWidget {
+  @override
+  _MainNavigationState createState() => _MainNavigationState();
+}
+
+class _MainNavigationState extends State<MainNavigation> {
+  int _currentIndex = 0;
+  final List<Widget> _pages = [
+    HomeScreen(), 
+    Center(child: Text("Programmes")), 
+    Center(child: Text("Stats"))
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (_, mode, __) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          themeMode: mode,
-          theme: ThemeData(
-            useMaterial3: true,
-            brightness: Brightness.light,
-            scaffoldBackgroundColor: const Color(0xFFF4F6F9),
-            cardColor: Colors.white,
-            colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3B82F6)),
-          ),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            brightness: Brightness.dark,
-            scaffoldBackgroundColor: const Color(0xFF09090B), // Noir OLED moderne
-            cardColor: const Color(0xFF18181B), // Cartes subtiles
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF38BDF8), // Cyan lumineux
-              secondary: Color(0xFF10B981), // Vert menthe
-              surface: Color(0xFF18181B),
-            ),
-            cardTheme: CardTheme(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              elevation: 0,
-            ),
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF38BDF8),
-                foregroundColor: Colors.black,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-            ),
-          ),
-          home: const HomeScreen(),
-        );
-      },
+    return Scaffold(
+      body: _pages[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.black,
+        selectedItemColor: Colors.blueAccent,
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        items: [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Accueil"),
+          BottomNavigationBarItem(icon: Icon(Icons.fitness_center), label: "Programmes"),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: "Stats"),
+        ],
+      ),
     );
   }
 }
