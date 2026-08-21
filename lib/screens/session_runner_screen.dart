@@ -20,21 +20,22 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   final PageController _pageController = PageController();
   int? _bpm;
   
-  final List<Map<String, dynamic>> _seriesList = [
+  // NOTE: Suppression du mot-clé 'final' pour permettre la réinitialisation
+  List<Map<String, dynamic>> _seriesList = [
     {'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false}
   ];
 
   @override
   void initState() {
     super.initState();
-    _initBpm();
+    _startBpmMonitoring();
   }
 
-  void _initBpm() async {
+  void _startBpmMonitoring() async {
     try {
       final health = Health();
       if (await health.requestAuthorization([HealthDataType.HEART_RATE])) {
-        Timer.periodic(const Duration(seconds: 15), (_) async {
+        Timer.periodic(const Duration(seconds: 15), (timer) async {
           if (!mounted) return;
           var data = await health.getHealthDataFromTypes(
             types: [HealthDataType.HEART_RATE],
@@ -49,7 +50,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     } catch (_) {}
   }
 
-  Future<void> _saveSession() async {
+  Future<void> _enregistrerSession() async {
     List<Map<String, dynamic>> formatted = _seriesList.map((s) => {
       'poids': s['poids'].text,
       'reps': s['reps'].text,
@@ -73,27 +74,22 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
         title: Text(exo.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         actions: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                _bpm != null ? "$_bpm BPM" : "-- BPM",
-                style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(_bpm != null ? "$_bpm BPM" : "-- BPM", style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
           )
         ],
       ),
       body: PageView(
         controller: _pageController,
         children: [
-          // PAGE 1 : Photo & Consignes
+          // PAGE 1 : Photo
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
                 Container(
-                  height: 240,
+                  height: 250,
                   decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(20)),
                   child: exo.images.isNotEmpty ? buildMediaWidget(exo.images.first, fit: BoxFit.cover) : const Center(child: Icon(Icons.fitness_center, size: 80)),
                 ),
@@ -109,7 +105,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
             ),
           ),
 
-          // PAGE 2 : Enregistrement Séries, RPE, Échec
+          // PAGE 2 : Séries
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -122,21 +118,16 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                       margin: const EdgeInsets.only(bottom: 10),
                       child: Padding(
                         padding: const EdgeInsets.all(8.0),
-                        child: Row(
-                          children: [
-                            Text("${i + 1}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 8),
-                            Expanded(child: TextField(controller: _seriesList[i]['poids'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'kg', isDense: true))),
-                            const SizedBox(width: 8),
-                            Expanded(child: TextField(controller: _seriesList[i]['reps'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'reps', isDense: true))),
-                            const SizedBox(width: 8),
-                            Expanded(child: TextField(controller: _seriesList[i]['rpe'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'RPE', isDense: true))),
-                            IconButton(
-                              icon: Icon(Icons.flag, color: _seriesList[i]['echec'] ? Colors.red : Colors.grey),
-                              onPressed: () => setState(() => _seriesList[i]['echec'] = !_seriesList[i]['echec']),
-                            ),
-                          ],
-                        ),
+                        child: Row(children: [
+                          Text("${i + 1}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _seriesList[i]['poids'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'kg', isDense: true))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _seriesList[i]['reps'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'reps', isDense: true))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _seriesList[i]['rpe'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'RPE', isDense: true))),
+                          IconButton(icon: Icon(Icons.flag, color: _seriesList[i]['echec'] ? Colors.red : Colors.grey), onPressed: () => setState(() => _seriesList[i]['echec'] = !_seriesList[i]['echec'])),
+                        ]),
                       ),
                     ),
                   ),
@@ -147,64 +138,20 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                   label: const Text("Ajouter une série"),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _saveSession,
-                        child: const Text("Enregistrer"),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-                        onPressed: () async {
-                          await _saveSession();
-                          if (_currentIndex < widget.exercices.length - 1) {
-                            setState(() {
-                              _currentIndex++;
-                              _seriesList = [{'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false}];
-                            });
-                            _pageController.jumpToPage(0);
-                          } else {
-                            Navigator.pop(context);
-                          }
-                        },
-                        child: const Text("Terminer"),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // PAGE 3 : Historique & Stats de l'exercice
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Historique de l'exercice", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: ListView(
-                    children: DatabaseHelper.instance.sessionsSauvegardees
-                        .where((s) => s['exercice'] == exo.nom)
-                        .toList()
-                        .reversed
-                        .take(10)
-                        .map((s) => Card(
-                              color: Colors.white.withOpacity(0.05),
-                              child: ListTile(
-                                title: Text("Date : ${s['date']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text("Séries enregistrées : ${(s['series'] as List).length}"),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                ),
+                Row(children: [
+                  Expanded(child: ElevatedButton(onPressed: _saveSession, child: const Text("Enregistrer"))),
+                  const SizedBox(width: 10),
+                  Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent), onPressed: () async {
+                    await _saveSession();
+                    if (_currentIndex < widget.exercices.length - 1) {
+                      setState(() {
+                        _currentIndex++;
+                        _seriesList = [{'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false}];
+                      });
+                      _pageController.jumpToPage(0);
+                    } else { Navigator.pop(context); }
+                  }, child: const Text("Terminer"))),
+                ]),
               ],
             ),
           ),
