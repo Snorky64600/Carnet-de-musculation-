@@ -4,7 +4,7 @@ import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await DatabaseHelper.Instance.chargardonnees(); // Garde cette ligne absolument !
+  await DatabaseHelper.instance.chargardonnees(); // Garde cette ligne absolument !
   runApp(CarnetMuscuApp());
 }
 
