@@ -14,61 +14,13 @@ class GestionExercicesScreen extends StatefulWidget {
 class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
   String _rechercheQuery = '';
 
-  void _ouvrirFormulaireExercice({ExerciseModel? exerciceExistant}) {
-    final nomController = TextEditingController(text: exerciceExistant?.nom ?? '');
-    final tagsController = TextEditingController(text: exerciceExistant?.tags.join(', ') ?? '');
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
-        title: Text(exerciceExistant == null ? 'Ajouter un exercice' : 'Modifier l\'exercice'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nomController,
-              decoration: const InputDecoration(labelText: 'Nom de l\'exercice'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: tagsController,
-              decoration: const InputDecoration(labelText: 'Tags (séparés par des virgules)'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              String nom = nomController.text.trim();
-              List<String> tags = tagsController.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
-
-              if (nom.isNotEmpty) {
-                if (exerciceExistant == null) {
-                  // Ajout d'un nouvel exercice
-                  await DatabaseHelper.instance.ajouterExerciceComplet(
-                    ExerciseModel(nom: nom, tags: tags, images: []),
-                  );
-                } else {
-                  // Modification de l'exercice existant
-                  await DatabaseHelper.instance.modifierExerciceComplet(
-                    exerciceExistant.nom,
-                    ExerciseModel(nom: nom, tags: tags, images: exerciceExistant.images, steps: exerciceExistant.steps),
-                  );
-                }
-                setState(() {});
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Enregistrer'),
-          ),
-        ],
+  void _ouvrirFormulaireComplet({ExerciseModel? exerciceExistant}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FormulaireExercicePage(exerciceExistant: exerciceExistant),
       ),
-    );
+    ).then((_) => setState(() {}));
   }
 
   @override
@@ -139,7 +91,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
                           trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                           onTap: () {
                             HapticFeedback.selectionClick();
-                            _ouvrirFormulaireExercice(exerciceExistant: exo);
+                            _ouvrirFormulaireComplet(exerciceExistant: exo);
                           },
                         ),
                       );
@@ -152,9 +104,144 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
         backgroundColor: Colors.blueAccent,
         onPressed: () {
           HapticFeedback.mediumImpact();
-          _ouvrirFormulaireExercice();
+          _ouvrirFormulaireComplet();
         },
         child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+}
+
+// --- PAGE DE FORMULAIRE COMPLET (IMAGES, TAGS, ETAPES) ---
+class FormulaireExercicePage extends StatefulWidget {
+  final ExerciseModel? exerciceExistant;
+  const FormulaireExercicePage({Key? key, this.exerciceExistant}) : super(key: key);
+
+  @override
+  State<FormulaireExercicePage> createState() => _FormulaireExercicePageState();
+}
+
+class _FormulaireExercicePageState extends State<FormulaireExercicePage> {
+  late TextEditingController _nomController;
+  late TextEditingController _tagsController;
+  late List<TextEditingController> _imageControllers;
+  late List<TextEditingController> _stepControllers;
+
+  @override
+  void initState() {
+    super.initState();
+    _nomController = TextEditingController(text: widget.exerciceExistant?.nom ?? '');
+    _tagsController = TextEditingController(text: widget.exerciceExistant?.tags.join(', ') ?? '');
+    
+    _imageControllers = widget.exerciceExistant?.images.isNotEmpty == true
+        ? widget.exerciceExistant!.images.map((img) => TextEditingController(text: img)).toList()
+        : [TextEditingController()];
+
+    _stepControllers = widget.exerciceExistant?.steps.isNotEmpty == true
+        ? widget.exerciceExistant!.steps.map((step) => TextEditingController(text: step)).toList()
+        : [TextEditingController()];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    bool isEditing = widget.exerciceExistant != null;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isEditing ? 'Modifier l\'exercice' : 'Nouvel exercice'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          TextField(
+            controller: _nomController,
+            decoration: const InputDecoration(labelText: 'Nom de l\'exercice', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _tagsController,
+            decoration: const InputDecoration(labelText: 'Tags (séparés par des virgules ex: Dos, Force)', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 24),
+          const Text('Images / GIFs (URLs)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blueAccent)),
+          const SizedBox(height: 8),
+          ..._imageControllers.asMap().entries.map((entry) {
+            int index = entry.key;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: entry.value,
+                      decoration: InputDecoration(labelText: 'URL Image ${index + 1}', border: const OutlineInputBorder()),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => setState(() => _imageControllers.removeAt(index)),
+                  ),
+                ],
+              ),
+            );
+          }),
+          ElevatedButton.icon(
+            onPressed: () => setState(() => _imageControllers.add(TextEditingController())),
+            icon: const Icon(Icons.add),
+            label: const Text('Ajouter une image'),
+          ),
+          const SizedBox(height: 24),
+          const Text('Étapes d\'exécution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blueAccent)),
+          const SizedBox(height: 8),
+          ..._stepControllers.asMap().entries.map((entry) {
+            int index = entry.key;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: entry.value,
+                      decoration: InputDecoration(labelText: 'Étape ${index + 1}', border: const OutlineInputBorder()),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => setState(() => _stepControllers.removeAt(index)),
+                  ),
+                ],
+              ),
+            );
+          }),
+          ElevatedButton.icon(
+            onPressed: () => setState(() => _stepControllers.add(TextEditingController())),
+            icon: const Icon(Icons.add),
+            label: const Text('Ajouter une étape'),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, padding: const EdgeInsets.all(16)),
+            onPressed: () async {
+              String nom = _nomController.text.trim();
+              List<String> tags = _tagsController.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+              List<String> images = _imageControllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
+              List<String> steps = _stepControllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
+
+              if (nom.isNotEmpty) {
+                ExerciseModel nouvelExo = ExerciseModel(nom: nom, tags: tags, images: images, steps: steps);
+
+                if (!isEditing) {
+                  await DatabaseHelper.instance.ajouterExerciceComplet(nouvelExo);
+                } else {
+                  await DatabaseHelper.instance.modifierExerciceComplet(widget.exerciceExistant!.nom, nouvelExo);
+                }
+
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Enregistrer l\'exercice', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
