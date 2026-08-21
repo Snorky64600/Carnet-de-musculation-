@@ -4,8 +4,8 @@ import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialisation propre de la base de données
-  await DatabaseHelper.instance.database;
+  // Utilisation de la bonne méthode : chargerDonnees()
+  await DatabaseHelper.instance.chargerDonnees();
   runApp(const CarnetMuscuApp());
 }
 
