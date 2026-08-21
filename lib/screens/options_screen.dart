@@ -31,8 +31,9 @@ class _OptionsScreenState extends State<OptionsScreen> {
             leading: const Icon(Icons.upload_file),
             title: const Text('Exporter vers CSV'),
             onTap: () async {
-              // Partage un message en attendant de lier la méthode d'export exacte de ta base
-              await Share.share("Export de mes données Carnet de Musculation", subject: 'Mon Historique Entraînement');
+              // Utilisation de la bonne méthode : exporterEnCsv()
+              String csvData = DatabaseHelper.instance.exporterEnCsv();
+              await Share.share(csvData, subject: 'Mon Historique Entraînement');
             },
           ),
           ListTile(
@@ -41,7 +42,7 @@ class _OptionsScreenState extends State<OptionsScreen> {
             onTap: () async {
               FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
               if (result != null) {
-                // Logique d'import ici
+                // Logique d'import si nécessaire
               }
             },
           ),
