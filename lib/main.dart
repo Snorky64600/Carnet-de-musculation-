@@ -103,8 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         }
       }
-    } catch (e) {
-      // Erreur silencieuse de synchro
+    } catch (_) {
     } finally {
       setState(() => _isLoadingBpm = false);
     }
@@ -115,7 +114,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final now = DateTime.now();
     final daysInMonth = DateUtils.getDaysInMonth(now.year, now.month);
     
-    // Extraction des jours où une séance a eu lieu ce mois-ci
     Set<int> joursSportifs = {};
     for (var session in DatabaseHelper.instance.sessionsSauvegardees) {
       String dateStr = session['date'] ?? '';
@@ -140,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Carte Fitbit / BPM en direct
+          // Carte Fitbit / BPM
           Card(
             color: Colors.red[950]?.withOpacity(0.6),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -171,15 +169,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Actions principales (Démarrer séance, Exercices, Stats)
+          // Actions principales
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, padding: const EdgeInsets.all(16)),
-                  onPressed: () {
-                    // Action démarrer séance
-                  },
+                  onPressed: () {},
                   icon: const Icon(Icons.play_arrow),
                   label: const Text("Démarrer"),
                 ),
@@ -197,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Mini Calendrier du mois en cours avec jours sportifs
+          // Mini Calendrier
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
@@ -235,20 +231,27 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Historique des derniers exercices réalisés
+          // Historique corrigé avec if/else natif
           const Text("Derniers entraînements", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          DatabaseHelper.instance.sessionsSauvegardees.isEmpty
-              ? const Text("Aucune séance enregistrée pour le moment.", style: TextStyle(color: Colors.grey))
-              : ...DatabaseHelper.instance.sessionsSauvegardees.reversed.take(5).map((session) => Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      title: Text(session['exercice'] ?? 'Séance', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(session['date'] ?? ''),
-                      trailing: Text('${(session['series'] as List?)?.length ?? 0} séries', style: const TextStyle(color: Colors.blueAccent)),
-                    ),
-                  )),
+          if (DatabaseHelper.instance.sessionsSauvegardees.isEmpty)
+            const Text("Aucune séance enregistrée pour le moment.", style: TextStyle(color: Colors.grey))
+          else
+            ...DatabaseHelper.instance.sessionsSauvegardees.reversed.take(5).map((session) => Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: ListTile(
+                    title: Text(session['exercice'] ?? 'Séance', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(session['date'] ?? ''),
+                    trailing: Text('${(session['series'] as List?)?.length ?? 0} séries', style: const TextStyle(color: Colors.blueAccent)),
+                  ),
+                )),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.blueAccent,
+        onPressed: () => FloatingTimerService.start(context, initialSeconds: 90),
+        label: const Text("Lancer Repos"),
+        icon: const Icon(Icons.timer),
       ),
     );
   }
@@ -265,5 +268,82 @@ class StatsScreen extends StatelessWidget {
         child: Text("Graphiques 1RM et Volumes", style: TextStyle(color: Colors.grey)),
       ),
     );
+  }
+}
+
+// --- MINUTEUR FLOTTANT ---
+class FloatingTimerService {
+  static OverlayEntry? _overlayEntry;
+  static int _secondsRemaining = 90;
+  static Timer? _timer;
+
+  static void start(BuildContext context, {int initialSeconds = 90}) {
+    if (_overlayEntry != null) return;
+    _secondsRemaining = initialSeconds;
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 80, right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blueAccent, 
+              borderRadius: BorderRadius.circular(16), 
+              boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 8)]
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                StatefulBuilder(
+                  builder: (context, setStateTimer) {
+                    _timer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
+                      if (_secondsRemaining > 0) {
+                        setStateTimer(() => _secondsRemaining--);
+                      } else {
+                        stop();
+                      }
+                    });
+                    String minSec = '${(_secondsRemaining ~/ 60).toString().padLeft(2, '0')}:${(_secondsRemaining % 60).toString().padLeft(2, '0')}';
+                    return Text(minSec, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold));
+                  },
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white24, padding: EdgeInsets.zero, minimumSize: const Size(40, 30)),
+                      onPressed: () => _secondsRemaining += 30,
+                      child: const Text('+30s', style: TextStyle(fontSize: 12)),
+                    ),
+                    const SizedBox(width: 4),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white24, padding: EdgeInsets.zero, minimumSize: const Size(40, 30)),
+                      onPressed: () => _secondsRemaining += 60,
+                      child: const Text('+60s', style: TextStyle(fontSize: 12)),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white, size: 18),
+                      onPressed: stop,
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  static void stop() {
+    _timer?.cancel();
+    _timer = null;
+    _overlayEntry?.remove();
+    _overlayEntry = null;
   }
 }
