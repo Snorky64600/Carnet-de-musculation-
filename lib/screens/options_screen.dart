@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import '../helpers/database_helper.dart';
@@ -13,6 +14,27 @@ class _OptionsScreenState extends State<OptionsScreen> {
   bool _healthConnectSync = false;
 
   @override
+  void initState() {
+    super.initState();
+    _chargerPreference();
+  }
+
+  Future<void> _chargerPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _healthConnectSync = prefs.getBool('health_connect_sync') ?? false;
+    });
+  }
+
+  Future<void> _sauvegarderPreference(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('health_connect_sync', value);
+    setState(() {
+      _healthConnectSync = value;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Options & Paramètres')),
@@ -23,7 +45,7 @@ class _OptionsScreenState extends State<OptionsScreen> {
           SwitchListTile(
             title: const Text('Synchro Google Health Connect'),
             value: _healthConnectSync,
-            onChanged: (val) => setState(() => _healthConnectSync = val),
+            onChanged: _sauvegarderPreference,
           ),
           const Divider(),
           const Text('Données (Import/Export)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
@@ -31,19 +53,8 @@ class _OptionsScreenState extends State<OptionsScreen> {
             leading: const Icon(Icons.upload_file),
             title: const Text('Exporter vers CSV'),
             onTap: () async {
-              // Utilisation de la bonne méthode : exporterEnCsv()
               String csvData = DatabaseHelper.instance.exporterEnCsv();
               await Share.share(csvData, subject: 'Mon Historique Entraînement');
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.download),
-            title: const Text('Importer depuis CSV'),
-            onTap: () async {
-              FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
-              if (result != null) {
-                // Logique d'import si nécessaire
-              }
             },
           ),
         ],
