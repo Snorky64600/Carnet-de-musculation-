@@ -20,7 +20,7 @@ class CarnetMuscuApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         primaryColor: Colors.blueAccent,
-        scaffoldBackgroundColor: const Color(0xFF0F172A), // Bleu nuit très moderne
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
         cardColor: const Color(0xFF1E293B),
       ),
       home: const MainNavigation(),
@@ -63,7 +63,6 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 }
 
-// --- WIDGET CARTE GLOSSY / GLASS ---
 Widget glassCard({required Widget child, EdgeInsetsGeometry? margin, EdgeInsetsGeometry? padding}) {
   return Container(
     margin: margin ?? const EdgeInsets.symmetric(vertical: 8),
@@ -131,7 +130,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Ouvrir le dialogue pour démarrer/enregistrer une séance rapidement
   void _ouvrirDemarrerSeance() {
     final exerciceController = TextEditingController();
     final poidsController = TextEditingController();
@@ -147,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             TextField(
               controller: exerciceController,
-              decoration: const InputDecoration(labelText: 'Nom de l\'exercice (ex: Développé couché)'),
+              decoration: const InputDecoration(labelText: 'Nom de l\'exercice'),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -190,7 +188,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Afficher les séances d'un jour spécifique cliqué dans le calendrier
   void _afficherSeancesDuJour(int jour, int mois, int annee) {
     var seancesDuJour = DatabaseHelper.instance.sessionsSauvegardees.where((s) {
       try {
@@ -267,7 +264,6 @@ class _HomeScreenState extends State<HomeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Carte Fitbit / BPM Glossy
           glassCard(
             child: Row(
               children: [
@@ -292,8 +288,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 12),
-
-          // Organisation des 3 boutons : Démarrer, Exercices, Historique
           Row(
             children: [
               Expanded(
@@ -329,9 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   ),
-                  onPressed: () {
-                    // Aller tout en bas ou scroll vers l'historique
-                  },
+                  onPressed: () {},
                   icon: const Icon(Icons.history),
                   label: const Text("Historique"),
                 ),
@@ -339,8 +331,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 20),
-
-          // Calendrier interactif Glossy
           glassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,8 +367,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Derniers entraînements
           const Text("Derniers entraînements", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           if (DatabaseHelper.instance.sessionsSauvegardees.isEmpty)
@@ -405,15 +393,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// --- ÉCRAN STATS DYNAMIQUE ---
 class StatsScreen extends StatelessWidget {
   const StatsScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    int totalEntraînements = DatabaseHelper.instance.sessionsSauvegardees.length;
+    int totalEntrainements = DatabaseHelper.instance.sessionsSauvegardees.length;
     
-    // Calcul du volume total (poids * reps)
     double volumeTotal = 0;
     for (var session in DatabaseHelper.instance.sessionsSauvegardees) {
       List series = session['series'] ?? [];
@@ -439,7 +425,7 @@ class StatsScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       const Text("Entraînements", style: TextStyle(color: Colors.grey, fontSize: 12)),
                       const SizedBox(height: 4),
-                      Text("$totalEntraînements", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                      Text("$totalEntrainements", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -463,23 +449,23 @@ class StatsScreen extends StatelessWidget {
           const SizedBox(height: 20),
           const Text("Récapitulatif des performances", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
-          totalEntraînements == 0
-              ? const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("Aucune donnée statistique disponible.", style: TextStyle(color: Colors.grey))))
-              : ...DatabaseHelper.instance.sessionsSauvegardees.map((session) => glassCard(
-                    padding: const EdgeInsets.all(12),
-                    child: ListTile(
-                      title: Text(session['exercice'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text("Date : ${session['date']}"),
-                      trailing: Text('${(session['series'] as List?)?.length ?? 0} séries', style: const TextStyle(color: Colors.blueAccent)),
-                    ),
-                  )),
+          if (totalEntrainements == 0)
+            const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("Aucune donnée statistique disponible.", style: TextStyle(color: Colors.grey))))
+          else
+            ...DatabaseHelper.instance.sessionsSauvegardees.map((session) => glassCard(
+                  padding: const EdgeInsets.all(12),
+                  child: ListTile(
+                    title: Text(session['exercice'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text("Date : ${session['date']}"),
+                    trailing: Text('${(session['series'] as List?)?.length ?? 0} séries', style: const TextStyle(color: Colors.blueAccent)),
+                  ),
+                )),
         ],
       ),
     );
   }
 }
 
-// --- MINUTEUR FLOTTANT ---
 class FloatingTimerService {
   static OverlayEntry? _overlayEntry;
   static int _secondsRemaining = 90;
@@ -524,12 +510,6 @@ class FloatingTimerService {
                   children: [
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.white24, padding: EdgeInsets.zero, minimumSize: const Size(40, 30)),
-                      onPressed: () => _secondsRemaining += 30,
-                      child: const Text('+30s', style: TextStyle(fontSize: 12)),
-                    ),
-                    const SizedBox(width: 4),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white24, padding: EdgeInsets.zero, minimumSize: const Size(40, 30)),
                       onPressed: () => _secondsRemaining += 60,
                       child: const Text('+60s', style: TextStyle(fontSize: 12)),
                     ),
@@ -556,3 +536,4 @@ class FloatingTimerService {
     _overlayEntry = null;
   }
 }
+        
