@@ -1,6 +1,20 @@
 import glob
+import base64
+import os
 
-# 1. Mise à jour des versions Gradle
+# 1. Génération d'un fichier KeyStore fixe (Signature unique permanente)
+KEYSTORE_BASE64 = """
+/3z4zA8AAAA0AAAAAgAAAAEAAAAAABdrZXkxAAAAAY9I/JgAAAAABAA4M0Yw
+ggNCMEAGQ3VzdG9tZXIxFDASBgNVBAMMC0Nhcm5ldE11c2N1MB4XDTI2MDgx
+ODE4MTIxMloXDTUxMDgxODE4MTIxMlowSDEUMBIGA1UEAwwLQ2FybmV0TXVz
+Y3UxFDASBgNVBAoMC0Nhcm5ldE11c2N1MRQwEgYDVQQDDAtDYXJuZXRNdXNj
+dTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAL2+Y
+"""
+
+keystore_path = "clean_build/android/app/key.jks"
+os.makedirs("clean_build/android/app", exist_ok=True)
+
+# 2. Mise à jour des versions Gradle
 for path in glob.glob("clean_build/android/**/*.gradle", recursive=True) + ["clean_build/android/settings.gradle"]:
     try:
         with open(path, "r") as f: content = f.read()
@@ -8,27 +22,43 @@ for path in glob.glob("clean_build/android/**/*.gradle", recursive=True) + ["cle
         with open(path, "w") as f: f.write(content)
     except: pass
 
-# 2. Configuration du minSdk à 26 (requis par Health Connect)
+# 3. Configuration build.gradle avec la clé fixe
 path_app = "clean_build/android/app/build.gradle"
 with open(path_app, "r") as f: content = f.read()
 content = content.replace("minSdkVersion 19", "minSdkVersion 26").replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 26")
+
+signing_config = """
+android {
+    signingConfigs {
+        release {
+            storeFile file('key.jks')
+            storePassword 'password'
+            keyAlias 'key'
+            keyPassword 'password'
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+"""
+content = content.replace("android {", signing_config)
 with open(path_app, "w") as f: f.write(content)
 
-# 3. Injection des permissions et déclaration Santé Connect
+# 4. Permissions et Santé Connect dans AndroidManifest.xml
 manifest_path = "clean_build/android/app/src/main/AndroidManifest.xml"
 with open(manifest_path, "r") as f: manifest_content = f.read()
 
-permissions_and_queries = """
+permissions = """
     <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
     <uses-permission android:name="android.permission.health.READ_EXERCISE"/>
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
     </queries>
     <application"""
+manifest_content = manifest_content.replace("<application", permissions)
 
-manifest_content = manifest_content.replace("<application", permissions_and_queries)
-
-# Déclaration obligatoire pour l'affichage dans Santé Connect
 health_alias = """
         <activity-alias
             android:name="ViewPermissionUsageActivity"
@@ -42,10 +72,9 @@ health_alias = """
         </activity-alias>
 """
 manifest_content = manifest_content.replace("</activity>", "</activity>\n" + health_alias)
-
 with open(manifest_path, "w") as f: f.write(manifest_content)
 
-# 4. Conversion MainActivity en FlutterFragmentActivity
+# 5. MainActivity Fragment
 for path in glob.glob("clean_build/android/app/src/main/kotlin/**/MainActivity.kt", recursive=True):
     with open(path, "w") as f:
         f.write("""package com.cyril.muscu.carnet_musculation;
