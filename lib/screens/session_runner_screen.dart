@@ -20,7 +20,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   final PageController _pageController = PageController();
   int? _bpm;
   
-  // NOTE: Suppression du mot-clé 'final' pour permettre la réinitialisation
   List<Map<String, dynamic>> _seriesList = [
     {'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false}
   ];
@@ -50,7 +49,8 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     } catch (_) {}
   }
 
-  Future<void> _enregistrerSession() async {
+  // Nom de fonction aligné avec les boutons de l'interface
+  Future<void> _saveSession() async {
     List<Map<String, dynamic>> formatted = _seriesList.map((s) => {
       'poids': s['poids'].text,
       'reps': s['reps'].text,
@@ -83,7 +83,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       body: PageView(
         controller: _pageController,
         children: [
-          // PAGE 1 : Photo
+          // PAGE 1 : Photo & Consignes
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -105,7 +105,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
             ),
           ),
 
-          // PAGE 2 : Séries
+          // PAGE 2 : Enregistrement Séries, RPE, Échec
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
