@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:health/health.dart';
 import '../models/exercise_model.dart';
 import '../widgets/media_widget.dart';
 import '../helpers/database_helper.dart';
@@ -18,122 +20,82 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
   
-  // Liste des séries pour l'exercice en cours
+  // BPM & Santé
+  int? _bpm;
+  Timer? _bpmTimer;
+
+  // Séries
   List<Map<String, dynamic>> _seriesList = [
-    {'poids': TextEditingController(), 'reps': TextEditingController(), 'echec': false}
+    {'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false}
   ];
 
-  // Chrono de récupération
+  // Chrono
   int? _tempsRestant;
   Timer? _chronoTimer;
 
   @override
+  void initState() {
+    super.initState();
+    _lancerSyncBpm();
+  }
+
+  Future<void> _lancerSyncBpm() async {
+    _syncBpm();
+    _bpmTimer = Timer.periodic(const Duration(seconds: 30), (_) => _syncBpm());
+  }
+
+  Future<void> _syncBpm() async {
+    try {
+      final health = Health();
+      final types = [HealthDataType.HEART_RATE];
+      if (await health.requestAuthorization(types)) {
+        List<HealthDataPoint> data = await health.getHealthDataFromTypes(types: types, startTime: DateTime.now().subtract(const Duration(minutes: 5)), endTime: DateTime.now());
+        if (data.isNotEmpty && data.last.value is NumericHealthValue) {
+          setState(() => _bpm = (data.last.value as NumericHealthValue).numericValue.toInt());
+        }
+      }
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     _chronoTimer?.cancel();
+    _bpmTimer?.cancel();
     for (var s in _seriesList) {
       s['poids'].dispose();
       s['reps'].dispose();
+      s['rpe'].dispose();
     }
     super.dispose();
   }
 
-  void _ajouterSerie() {
-    setState(() {
-      _seriesList.add({
-        'poids': TextEditingController(text: _seriesList.isNotEmpty ? _seriesList.last['poids'].text : ''),
-        'reps': TextEditingController(),
-        'echec': false
-      });
-    });
-  }
-
   void _lancerChrono(int secondes) {
     _chronoTimer?.cancel();
-    setState(() {
-      _tempsRestant = secondes;
-    });
+    setState(() => _tempsRestant = secondes);
     _chronoTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_tempsRestant != null && _tempsRestant! > 0) {
-        setState(() {
-          _tempsRestant = _tempsRestant! - 1; // Correction null-safety
-        });
+        setState(() => _tempsRestant = _tempsRestant! - 1);
       } else {
+        HapticFeedback.heavyImpact(); // Vibration forte à la fin
         _chronoTimer?.cancel();
-        setState(() {
-          _tempsRestant = null;
-        });
+        setState(() => _tempsRestant = null);
       }
     });
   }
 
-  void _afficherChoixChrono() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1E293B),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Chrono de Récupération", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _buildChronoChip("30 sec", 30),
-                _buildChronoChip("60 sec", 60),
-                _buildChronoChip("90 sec", 90),
-                _buildChronoChip("3 min", 180),
-                _buildChronoChip("5 min", 300),
-                _buildChronoChip("Libre", 9999),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChronoChip(String label, int secondes) {
-    return ActionChip(
-      backgroundColor: Colors.white.withOpacity(0.08),
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-      onPressed: () {
-        Navigator.pop(context);
-        _lancerChrono(secondes);
-      },
-    );
-  }
-
-  void _enregistrerEtSuivant() async {
+  Future<void> _sauvegarderSession() async {
     List<Map<String, dynamic>> seriesFormattees = _seriesList.map((s) => {
       'poids': s['poids'].text.trim(),
       'reps': s['reps'].text.trim(),
+      'rpe': s['rpe'].text.trim(),
       'echec': s['echec'],
     }).toList();
 
-    Map<String, dynamic> seance = {
+    await DatabaseHelper.instance.ajouterSeance({
       'date': DateTime.now().toString().split(' ')[0],
       'exercice': widget.exercices[_currentIndex].nom,
       'series': seriesFormattees,
-    };
-    
-    await DatabaseHelper.instance.ajouterSeance(seance);
-
-    if (_currentIndex < widget.exercices.length - 1) {
-      setState(() {
-        _currentIndex++;
-        _seriesList = [
-          {'poids': TextEditingController(), 'reps': TextEditingController(), 'echec': false}
-        ];
-      });
-      _pageController.jumpToPage(0);
-    } else {
-      Navigator.pop(context);
-    }
+    });
   }
 
   @override
@@ -144,170 +106,79 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       appBar: AppBar(
         title: Text(currentExo.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
-        elevation: 0,
         actions: [
-          if (_tempsRestant != null)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Chip(
-                  backgroundColor: Colors.blueAccent,
-                  label: Text(
-                    _tempsRestant == 9999 ? "Libre" : "${_tempsRestant! ~/ 60}:${(_tempsRestant! % 60).toString().padLeft(2, '0')}",
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.timer, color: Colors.blueAccent),
-              onPressed: _afficherChoixChrono,
-            )
+          Chip(
+            backgroundColor: Colors.redAccent.withOpacity(0.2),
+            label: Text(_bpm != null ? "$_bpm BPM" : "-- BPM", style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 10),
         ],
       ),
       body: PageView(
         controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
         children: [
           // PAGE 1 : Photo & Description
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Container(
-                  height: 240,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: currentExo.images.isNotEmpty
-                        ? buildMediaWidget(currentExo.images.first, fit: BoxFit.cover)
-                        : const Center(child: Icon(Icons.fitness_center, size: 80, color: Colors.blueAccent)),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.04),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
-                    ),
-                    child: ListView(
-                      children: [
-                        const Text("Description & Exécution", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 16)),
-                        const SizedBox(height: 10),
-                        Text(
-                          currentExo.steps.isNotEmpty ? currentExo.steps.join('\n\n') : "Aucune consigne détaillée pour cet exercice.",
-                          style: const TextStyle(fontSize: 14, color: Colors.white70, height: 1.4),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  ),
-                  onPressed: () => _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
-                  child: const Text("Passer aux Séries", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
-              ],
-            ),
-          ),
-
-          // PAGE 2 : Enregistrement des Séries
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _seriesList.length,
-                    itemBuilder: (context, index) {
-                      var serie = _seriesList[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.04),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withOpacity(0.1)),
-                        ),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: Colors.blueAccent.withOpacity(0.2),
-                              child: Text("${index + 1}", style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: serie['poids'],
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(labelText: 'Poids (kg)', isDense: true),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: serie['reps'],
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(labelText: 'Reps', isDense: true),
-                              ),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.local_fire_department, color: serie['echec'] ? Colors.redAccent : Colors.grey),
-                              onPressed: () => setState(() => serie['echec'] = !serie['echec']),
-                              tooltip: "Échec",
-                            ),
-                            if (_seriesList.length > 1)
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline, color: Colors.grey),
-                                onPressed: () => setState(() => _seriesList.removeAt(index)),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 45),
-                    side: const BorderSide(color: Colors.blueAccent),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  ),
-                  onPressed: _ajouterSerie,
-                  icon: const Icon(Icons.add, color: Colors.blueAccent),
-                  label: const Text("Ajouter une série", style: TextStyle(color: Colors.blueAccent)),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  ),
-                  onPressed: _enregistrerEtSuivant,
-                  child: Text(
-                    _currentIndex < widget.exercices.length - 1 ? "Enregistrer & Exercice Suivant" : "Enregistrer & Terminer la Séance",
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _buildInfoPage(currentExo),
+          // PAGE 2 : Enregistrement séries (RPE + Séries)
+          _buildLoggingPage(),
+          // PAGE 3 : Historique & Stats de l'exercice
+          _buildHistoryPage(currentExo.nom),
         ],
       ),
+    );
+  }
+
+  Widget _buildInfoPage(ExerciseModel exo) => Padding(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      children: [
+        Container(height: 250, width: double.infinity, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(20)), child: exo.images.isNotEmpty ? buildMediaWidget(exo.images.first, fit: BoxFit.cover) : const Icon(Icons.fitness_center, size: 80)),
+        const SizedBox(height: 20),
+        Text(exo.steps.isNotEmpty ? exo.steps.join('\n') : "Pas de consigne.", style: const TextStyle(fontSize: 16)),
+        const Spacer(),
+        ElevatedButton(onPressed: () => _pageController.jumpToPage(1), child: const Text("Passer à l'entraînement")),
+      ],
+    ),
+  );
+
+  Widget _buildLoggingPage() => Padding(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      children: [
+        Expanded(child: ListView.builder(
+          itemCount: _seriesList.length,
+          itemBuilder: (context, i) => _buildSerieRow(i),
+        )),
+        OutlinedButton(onPressed: () => setState(() => _seriesList.add({'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false})), child: const Text("Ajouter Série")),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: ElevatedButton(onPressed: _sauvegarderSession, child: const Text("Enregistrer"))),
+          const SizedBox(width: 10),
+          Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent), onPressed: () { _sauvegarderSession(); if(_currentIndex < widget.exercices.length - 1) { setState(() => _currentIndex++); _pageController.jumpToPage(0); } else { Navigator.pop(context); } }, child: const Text("Terminer"))),
+        ]),
+      ],
+    ),
+  );
+
+  Widget _buildSerieRow(int i) => Card(
+    color: Colors.white.withOpacity(0.05),
+    child: Row(children: [
+      Text("${i+1}"),
+      Expanded(child: TextField(controller: _seriesList[i]['poids'], decoration: const InputDecoration(labelText: 'kg'))),
+      Expanded(child: TextField(controller: _seriesList[i]['reps'], decoration: const InputDecoration(labelText: 'reps'))),
+      Expanded(child: TextField(controller: _seriesList[i]['rpe'], decoration: const InputDecoration(labelText: 'RPE'))),
+      IconButton(icon: Icon(Icons.flag, color: _seriesList[i]['echec'] ? Colors.red : Colors.grey), onPressed: () => setState(() => _seriesList[i]['echec'] = !_seriesList[i]['echec'])),
+    ]),
+  );
+
+  Widget _buildHistoryPage(String exoName) {
+    var history = DatabaseHelper.instance.sessionsSauvegardees.where((s) => s['exercice'] == exoName).toList().reversed.take(10);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text("Historique Récent", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ...history.map((s) => ListTile(title: Text(s['date']), subtitle: Text("Séries: ${s['series'].length}")))
+      ],
     );
   }
 }
