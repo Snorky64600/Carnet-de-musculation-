@@ -31,9 +31,8 @@ class _OptionsScreenState extends State<OptionsScreen> {
             leading: const Icon(Icons.upload_file),
             title: const Text('Exporter vers CSV'),
             onTap: () async {
-              // Correction ici : 'instance' avec un 'i' minuscule
-              String csvData = await DatabaseHelper.instance.exportercsv();
-              await Share.share(csvData, subject: 'Mon Historique Entraînement');
+              // Partage un message en attendant de lier la méthode d'export exacte de ta base
+              await Share.share("Export de mes données Carnet de Musculation", subject: 'Mon Historique Entraînement');
             },
           ),
           ListTile(
