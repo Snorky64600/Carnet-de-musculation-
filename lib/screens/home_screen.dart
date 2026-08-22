@@ -6,6 +6,7 @@ import 'package:health/health.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../helpers/database_helper.dart';
 import '../models/exercise_model.dart';
+import '../widgets/media_widget.dart';
 import 'session_runner_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -91,63 +92,120 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Présentation identique à la page "Gérer les exercices"
   void _ouvrirSelectionExercice() {
     String recherche = '';
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
+        builder: (context, setModalState) {
           var exos = DatabaseHelper.instance.exercicesDisponibles
               .where((e) => e.nom.toLowerCase().contains(recherche.toLowerCase()))
               .toList();
           exos.sort((a, b) => a.nom.compareTo(b.nom));
 
-          return AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('Choisir un exercice', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            content: SizedBox(
-              width: double.maxFinite,
-              height: 400,
-              child: Column(
-                children: [
-                  TextField(
-                    onChanged: (val) => setDialogState(() => recherche = val),
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.85,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Sélectionner un exercice",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+
+                // Barre de recherche
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: TextField(
+                    onChanged: (val) => setModalState(() => recherche = val),
                     style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Rechercher...',
-                      hintStyle: const TextStyle(color: Colors.grey),
-                      prefixIcon: const Icon(Icons.search, color: Colors.blueAccent),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    decoration: const InputDecoration(
+                      hintText: 'Rechercher un exercice...',
+                      hintStyle: TextStyle(color: Colors.grey),
+                      prefixIcon: Icon(Icons.search, color: Colors.blueAccent),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: exos.length,
-                      itemBuilder: (context, index) {
-                        final exo = exos[index];
-                        return ListTile(
-                          title: Text(exo.nom, style: const TextStyle(color: Colors.white)),
-                          subtitle: Text(exo.tags.join(' • '), style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          trailing: const Icon(Icons.chevron_right, color: Colors.blueAccent),
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SessionRunnerScreen(exercices: [exo]),
+                ),
+                const SizedBox(height: 16),
+
+                // Liste sous forme de cartes élégantes
+                Expanded(
+                  child: exos.isEmpty
+                      ? const Center(child: Text("Aucun exercice trouvé.", style: TextStyle(color: Colors.grey)))
+                      : ListView.builder(
+                          itemCount: exos.length,
+                          itemBuilder: (context, index) {
+                            final exo = exos[index];
+                            return Card(
+                              color: Colors.white.withOpacity(0.04),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(color: Colors.white.withOpacity(0.08)),
+                              ),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                leading: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    width: 56,
+                                    height: 56,
+                                    color: Colors.white.withOpacity(0.05),
+                                    child: exo.images.isNotEmpty
+                                        ? buildMediaWidget(exo.images.first, fit: BoxFit.cover)
+                                        : const Icon(Icons.fitness_center, color: Colors.blueAccent),
+                                  ),
+                                ),
+                                title: Text(
+                                  exo.nom,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                                ),
+                                subtitle: Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    exo.tags.isNotEmpty ? exo.tags.join(', ') : 'Général',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: Colors.grey, fontSize: 13),
+                                  ),
+                                ),
+                                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SessionRunnerScreen(exercices: [exo]),
+                                    ),
+                                  );
+                                },
                               ),
                             );
                           },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                        ),
+                ),
+              ],
             ),
           );
         },
