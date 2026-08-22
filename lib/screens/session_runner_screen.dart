@@ -17,146 +17,327 @@ class SessionRunnerScreen extends StatefulWidget {
 }
 
 class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
-  // --- VARIABLES D'ÉTAT ---
-  int _currentIndex = 0; // C'est ici que l'erreur était !
+  int _currentIndex = 0;
   final PageController _pageController = PageController();
-  
   int? _bpm;
-  List<Map<String, dynamic>> _seriesList = [
-    {'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false}
-  ];
+  
+  // Gestion des séries
+  List<Map<String, dynamic>> _seriesList = [];
+
+  // Chrono de repos intégré
+  int _selectedRestSeconds = 90;
+  int? _restTimeRemaining;
+  Timer? _restTimer;
+  bool _isResting = false;
 
   @override
   void initState() {
     super.initState();
+    _reinitialiserSeries();
     _startBpmMonitoring();
   }
 
-  void _startBpmMonitoring() async {
-    final health = Health();
-    bool authorized = await health.requestAuthorization([HealthDataType.HEART_RATE]);
-    if (authorized) {
-      Timer.periodic(const Duration(seconds: 15), (timer) async {
-        if (!mounted) return;
-        List<HealthDataPoint> data = await health.getHealthDataFromTypes(
-          types: [HealthDataType.HEART_RATE],
-          startTime: DateTime.now().subtract(const Duration(minutes: 5)),
-          endTime: DateTime.now(),
-        );
-        if (data.isNotEmpty && data.last.value is NumericHealthValue) {
-          setState(() => _bpm = (data.last.value as NumericHealthValue).numericValue.toInt());
-        }
-      });
-    }
+  @override
+  void dispose() {
+    _restTimer?.cancel();
+    super.dispose();
   }
 
-  // --- LOGIQUE SAUVEGARDE ---
-  Future<void> _enregistrerSession() async {
-    List<Map<String, dynamic>> seriesFormattees = _seriesList.map((s) => {
-      'poids': s['poids'].text.trim(),
-      'reps': s['reps'].text.trim(),
-      'rpe': s['rpe'].text.trim(),
+  void _reinitialiserSeries() {
+    _seriesList = [
+      {'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false}
+    ];
+  }
+
+  void _startBpmMonitoring() async {
+    try {
+      final health = Health();
+      if (await health.requestAuthorization([HealthDataType.HEART_RATE])) {
+        Timer.periodic(const Duration(seconds: 15), (timer) async {
+          if (!mounted) return;
+          var data = await health.getHealthDataFromTypes(
+            types: [HealthDataType.HEART_RATE],
+            startTime: DateTime.now().subtract(const Duration(minutes: 5)),
+            endTime: DateTime.now(),
+          );
+          if (data.isNotEmpty && data.last.value is NumericHealthValue) {
+            setState(() => _bpm = (data.last.value as NumericHealthValue).numericValue.toInt());
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  // --- Gestion du Chrono de Repos ---
+  void _lancerRepos(int seconds) {
+    _restTimer?.cancel();
+    setState(() {
+      _selectedRestSeconds = seconds;
+      _restTimeRemaining = seconds;
+      _isResting = true;
+    });
+
+    _restTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (_restTimeRemaining != null && _restTimeRemaining! > 0) {
+        setState(() => _restTimeRemaining = _restTimeRemaining! - 1);
+      } else {
+        HapticFeedback.heavyImpact(); // Vibration forte de fin de repos
+        _restTimer?.cancel();
+        setState(() {
+          _isResting = false;
+          _restTimeRemaining = null;
+        });
+      }
+    });
+  }
+
+  void _annulerRepos() {
+    _restTimer?.cancel();
+    setState(() {
+      _isResting = false;
+      _restTimeRemaining = null;
+    });
+  }
+
+  String _formatRestTime(int totalSeconds) {
+    int minutes = totalSeconds ~/ 60;
+    int seconds = totalSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _saveSession() async {
+    List<Map<String, dynamic>> formatted = _seriesList.map((s) => {
+      'poids': s['poids'].text,
+      'reps': s['reps'].text,
+      'rpe': s['rpe'].text,
       'echec': s['echec'],
     }).toList();
 
     await DatabaseHelper.instance.ajouterSeance({
       'date': DateTime.now().toString().split(' ')[0],
       'exercice': widget.exercices[_currentIndex].nom,
-      'series': seriesFormattees,
+      'series': formatted,
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    ExerciseModel currentExo = widget.exercices[_currentIndex];
+    final exo = widget.exercices[_currentIndex];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(currentExo.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(exo.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         actions: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(children: [
-              const Icon(Icons.favorite, color: Colors.redAccent, size: 20),
-              const SizedBox(width: 5),
-              Text(_bpm != null ? "$_bpm" : "--", style: const TextStyle(fontWeight: FontWeight.bold)),
-            ]),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                const Icon(Icons.favorite, color: Colors.redAccent, size: 20),
+                const SizedBox(width: 6),
+                Text(_bpm != null ? "$_bpm" : "--", style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
           )
         ],
       ),
       body: PageView(
         controller: _pageController,
         children: [
-          // PAGE 1: INFO
-          _buildInfoPage(currentExo),
-          // PAGE 2: LOGGING
-          _buildLoggingPage(),
-          // PAGE 3: STATS
-          _buildStatsPage(currentExo.nom),
+          // PAGE 1 : Visuel & Description
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Container(
+                  height: 240,
+                  width: double.infinity,
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(20)),
+                  child: exo.images.isNotEmpty ? buildMediaWidget(exo.images.first, fit: BoxFit.cover) : const Center(child: Icon(Icons.fitness_center, size: 80)),
+                ),
+                const SizedBox(height: 20),
+                Text(exo.steps.isNotEmpty ? exo.steps.join('\n\n') : "Aucune consigne.", style: const TextStyle(fontSize: 15, height: 1.3)),
+                const Spacer(),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, minimumSize: const Size(double.infinity, 50)),
+                  onPressed: () => _pageController.jumpToPage(1),
+                  child: const Text("Passer aux séries"),
+                ),
+              ],
+            ),
+          ),
+
+          // PAGE 2 : Enregistrement des Séries & Chrono de Repos intégré
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // BLOC CHRONO DE RÉCUPÉRATION (Style Sweat)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Récupération :", style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold)),
+                          if (_isResting)
+                            Text(
+                              _formatRestTime(_restTimeRemaining!),
+                              style: const TextStyle(color: Colors.tealAccent, fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildRestChip("30s", 30),
+                          _buildRestChip("60s", 60),
+                          _buildRestChip("90s", 90),
+                          _buildRestChip("3 min", 180),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 38,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isResting ? Colors.orangeAccent : Colors.teal,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () {
+                            if (_isResting) {
+                              _annulerRepos();
+                            } else {
+                              _lancerRepos(_selectedRestSeconds);
+                            }
+                          },
+                          icon: Icon(_isResting ? Icons.stop : Icons.timer, size: 18),
+                          label: Text(_isResting ? "Arrêter le repos" : "Lancer le repos (${_selectedRestSeconds < 60 ? '$_selectedRestSeconds' 's' : '${_selectedRestSeconds ~/ 60} min'})", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // LISTE DES SÉRIES
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _seriesList.length,
+                    itemBuilder: (context, i) => Card(
+                      color: Colors.white.withOpacity(0.05),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(children: [
+                          Text("S${i + 1}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _seriesList[i]['poids'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Poids (kg)', isDense: true))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _seriesList[i]['reps'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Reps', isDense: true))),
+                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _seriesList[i]['rpe'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'RPE', isDense: true))),
+                          IconButton(
+                            icon: Icon(Icons.flag, color: _seriesList[i]['echec'] ? Colors.redAccent : Colors.grey),
+                            onPressed: () => setState(() => _seriesList[i]['echec'] = !_seriesList[i]['echec']),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => setState(() => _seriesList.add({'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false})),
+                  icon: const Icon(Icons.add),
+                  label: const Text("Ajouter une série"),
+                ),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await _saveSession();
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Séance enregistrée !")));
+                      },
+                      child: const Text("Enregistrer"),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF0055)),
+                      onPressed: () async {
+                        await _saveSession();
+                        if (_currentIndex < widget.exercices.length - 1) {
+                          setState(() {
+                            _currentIndex++;
+                            _reinitialiserSeries();
+                          });
+                          _pageController.jumpToPage(0);
+                        } else {
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: const Text("Terminer la séance"),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          ),
+
+          // PAGE 3 : Historique de l'exercice
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Historique Récent", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: ListView(
+                    children: DatabaseHelper.instance.sessionsSauvegardees
+                        .where((s) => s['exercice'] == exo.nom)
+                        .toList()
+                        .reversed
+                        .take(10)
+                        .map((s) => Card(
+                              color: Colors.white.withOpacity(0.05),
+                              child: ListTile(
+                                title: Text("Date : ${s['date']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text("Séries : ${(s['series'] as List).length}"),
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoPage(ExerciseModel exo) => Padding(
-    padding: const EdgeInsets.all(16),
-    child: Column(
-      children: [
-        Container(height: 250, decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(20)), child: exo.images.isNotEmpty ? buildMediaWidget(exo.images.first, fit: BoxFit.cover) : const Center(child: Icon(Icons.fitness_center, size: 80))),
-        const SizedBox(height: 20),
-        Text(exo.steps.isNotEmpty ? exo.steps.join('\n') : "Aucune consigne.", style: const TextStyle(fontSize: 16)),
-        const Spacer(),
-        ElevatedButton(onPressed: () => _pageController.jumpToPage(1), child: const Text("Passer à l'entraînement")),
-      ],
-    ),
-  );
-
-  Widget _buildLoggingPage() => Padding(
-    padding: const EdgeInsets.all(16),
-    child: Column(
-      children: [
-        Expanded(child: ListView.builder(
-          itemCount: _seriesList.length,
-          itemBuilder: (context, i) => Card(
-            color: Colors.white.withOpacity(0.05),
-            child: Row(children: [
-              Text("${i+1}", style: const TextStyle(fontWeight: FontWeight.bold)),
-              Expanded(child: TextField(controller: _seriesList[i]['poids'], decoration: const InputDecoration(labelText: 'kg'))),
-              Expanded(child: TextField(controller: _seriesList[i]['reps'], decoration: const InputDecoration(labelText: 'reps'))),
-              Expanded(child: TextField(controller: _seriesList[i]['rpe'], decoration: const InputDecoration(labelText: 'RPE'))),
-              IconButton(icon: Icon(Icons.flag, color: _seriesList[i]['echec'] ? Colors.red : Colors.grey), onPressed: () => setState(() => _seriesList[i]['echec'] = !_seriesList[i]['echec'])),
-            ]),
-          ),
-        )),
-        OutlinedButton(onPressed: () => setState(() => _seriesList.add({'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false})), child: const Text("Ajouter Série")),
-        const SizedBox(height: 10),
-        Row(children: [
-          Expanded(child: ElevatedButton(onPressed: _enregistrerSession, child: const Text("Enregistrer"))),
-          const SizedBox(width: 10),
-          Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent), onPressed: () async {
-            await _enregistrerSession();
-            if(_currentIndex < widget.exercices.length - 1) {
-              setState(() { _currentIndex++; _seriesList = [{'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false}]; });
-              _pageController.jumpToPage(0);
-            } else { Navigator.pop(context); }
-          }, child: const Text("Terminer"))),
-        ]),
-      ],
-    ),
-  );
-
-  Widget _buildStatsPage(String exoName) {
-    var history = DatabaseHelper.instance.sessionsSauvegardees.where((s) => s['exercice'] == exoName).toList().reversed.take(5);
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("Historique & Stats", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ...history.map((s) => ListTile(title: Text(s['date']), subtitle: Text("Séries: ${s['series'].length}")))
-        ],
-      ),
+  Widget _buildRestChip(String label, int seconds) {
+    bool isSelected = _selectedRestSeconds == seconds;
+    return ChoiceChip(
+      label: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isSelected ? Colors.black : Colors.white)),
+      selected: isSelected,
+      selectedColor: Colors.tealAccent,
+      backgroundColor: Colors.white.withOpacity(0.08),
+      onSelected: (_) => setState(() => _selectedRestSeconds = seconds),
     );
   }
 }
+
