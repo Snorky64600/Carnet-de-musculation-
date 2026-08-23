@@ -494,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: const Icon(Icons.chevron_right, color: Colors.white70),
                 onPressed: () {
                   setState(() {
-                    _currentMonth = DateTime(_currentMonth.year, _currentMonthmonth + 1);
+                    _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
                   });
                 },
               ),
