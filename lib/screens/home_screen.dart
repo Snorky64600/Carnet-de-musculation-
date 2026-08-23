@@ -20,10 +20,53 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _bpm;
   bool _isSyncingBpm = false;
 
+  // Gestion du calendrier
+  DateTime _currentMonth = DateTime.now();
+  Map<String, List<Map<String, dynamic>>> _sessionsParDate = {};
+
+  // Séance / Programme en cours
+  Map<String, dynamic>? _programmeEnCours;
+
   @override
   void initState() {
     super.initState();
     _syncBpm();
+    _chargerDonneesCalendrierEtProgramme();
+  }
+
+  void _chargerDonneesCalendrierEtProgramme() async {
+    // Regroupement des séances sauvegardées par date (format YYYY-MM-DD)
+    Map<String, List<Map<String, dynamic>>> groupe = {};
+    for (var session in DatabaseHelper.instance.sessionsSauvegardees) {
+      String dateKey = session['date'] ?? '';
+      if (dateKey.isNotEmpty) {
+        groupe.putIfAbsent(dateKey, () => []).add(session);
+      }
+    }
+
+    // Chargement du programme/séance en cours depuis SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    final String? progEnCoursStr = prefs.getString('programme_en_cours');
+    Map<String, dynamic>? progEnCours;
+    if (progEnCoursStr != null) {
+      progEnCours = jsonDecode(progEnCoursStr);
+    } else {
+      // Si aucun n'est enregistré comme "en cours", on propose le premier programme créé s'il existe
+      final String? progStr = prefs.getString('mes_programmes');
+      if (progStr != null) {
+        List progs = jsonDecode(progStr);
+        if (progs.isNotEmpty) {
+          progEnCours = progs.first;
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _sessionsParDate = groupe;
+        _programmeEnCours = progEnCours;
+      });
+    }
   }
 
   Future<void> _syncBpm() async {
@@ -47,6 +90,64 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) {
       setState(() => _isSyncingBpm = false);
     }
+  }
+
+  // --- MODALE POUR LES SÉANCES DU JOUR CLIQUÉ ---
+  void _afficherDetailJour(String dateFormatted, List<Map<String, dynamic>> sessions) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(Icons.event_available, color: Colors.tealAccent),
+                const SizedBox(width: 10),
+                Text(
+                  "Séances du $dateFormatted",
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: sessions.length,
+                itemBuilder: (context, index) {
+                  final s = sessions[index];
+                  List series = s['series'] ?? [];
+                  return Card(
+                    color: Colors.white.withOpacity(0.05),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: ListTile(
+                      title: Text(s['exercice'] ?? 'Exercice', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                      subtitle: Text("${series.length} série(s) enregistrée(s)", style: const TextStyle(color: Colors.grey)),
+                      trailing: const Icon(Icons.check_circle, color: Colors.tealAccent),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _ouvrirChoixDemarrage() {
@@ -92,7 +193,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Présentation identique à la page "Gérer les exercices"
   void _ouvrirSelectionExercice() {
     String recherche = '';
     showModalBottomSheet(
@@ -117,19 +217,13 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Center(
                   child: Container(
-                    width: 40,
-                    height: 4,
+                    width: 40, height: 4,
                     decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  "Sélectionner un exercice",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
+                const Text("Sélectionner un exercice", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                 const SizedBox(height: 16),
-
-                // Barre de recherche
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.05),
@@ -148,62 +242,48 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Liste sous forme de cartes élégantes
                 Expanded(
-                  child: exos.isEmpty
-                      ? const Center(child: Text("Aucun exercice trouvé.", style: TextStyle(color: Colors.grey)))
-                      : ListView.builder(
-                          itemCount: exos.length,
-                          itemBuilder: (context, index) {
-                            final exo = exos[index];
-                            return Card(
-                              color: Colors.white.withOpacity(0.04),
-                              margin: const EdgeInsets.only(bottom: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                side: BorderSide(color: Colors.white.withOpacity(0.08)),
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                leading: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    width: 56,
-                                    height: 56,
-                                    color: Colors.white.withOpacity(0.05),
-                                    child: exo.images.isNotEmpty
-                                        ? buildMediaWidget(exo.images.first, fit: BoxFit.cover)
-                                        : const Icon(Icons.fitness_center, color: Colors.blueAccent),
-                                  ),
-                                ),
-                                title: Text(
-                                  exo.nom,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(
-                                    exo.tags.isNotEmpty ? exo.tags.join(', ') : 'Général',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Colors.grey, fontSize: 13),
-                                  ),
-                                ),
-                                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SessionRunnerScreen(exercices: [exo]),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
+                  child: ListView.builder(
+                    itemCount: exos.length,
+                    itemBuilder: (context, index) {
+                      final exo = exos[index];
+                      return Card(
+                        color: Colors.white.withOpacity(0.04),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: Colors.white.withOpacity(0.08)),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              width: 56, height: 56,
+                              color: Colors.white.withOpacity(0.05),
+                              child: exo.images.isNotEmpty
+                                  ? buildMediaWidget(exo.images.first, fit: BoxFit.cover)
+                                  : const Icon(Icons.fitness_center, color: Colors.blueAccent),
+                            ),
+                          ),
+                          title: Text(exo.nom, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                          subtitle: Text(
+                            exo.tags.isNotEmpty ? exo.tags.join(', ') : 'Général',
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          ),
+                          trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => SessionRunnerScreen(exercices: [exo])),
+                            ).then((_) => _chargerDonneesCalendrierEtProgramme());
                           },
                         ),
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
@@ -231,12 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
           width: double.maxFinite,
           height: 300,
           child: programmes.isEmpty
-              ? const Center(
-                  child: Text(
-                    'Aucun programme créé.',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
+              ? const Center(child: Text('Aucun programme créé.', style: TextStyle(color: Colors.grey)))
               : ListView.builder(
                   itemCount: programmes.length,
                   itemBuilder: (context, index) {
@@ -246,16 +321,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: Text(prog['nom'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                       subtitle: Text('${exosList.length} exercices', style: const TextStyle(color: Colors.grey)),
                       trailing: const Icon(Icons.play_arrow, color: Colors.blueAccent),
-                      onTap: () {
+                      onTap: () async {
                         Navigator.pop(context);
-                        List<ExerciseModel> exos =
-                            exosList.map((e) => ExerciseModel.fromJson(e)).toList();
+                        await prefs.setString('programme_en_cours', jsonEncode(prog));
+                        List<ExerciseModel> exos = exosList.map((e) => ExerciseModel.fromJson(e)).toList();
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => SessionRunnerScreen(exercices: exos, isProgramme: true),
-                          ),
-                        );
+                          MaterialPageRoute(builder: (_) => SessionRunnerScreen(exercices: exos, isProgramme: true)),
+                        ).then((_) => _chargerDonneesCalendrierEtProgramme());
                       },
                     );
                   },
@@ -288,7 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Carte Fitbit / BPM
+          // 1. CARTE FITBIT / BPM
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -327,8 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: _isSyncingBpm
                       ? const SizedBox(
-                          width: 20,
-                          height: 20,
+                          width: 20, height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blueAccent),
                         )
                       : const Icon(Icons.refresh, color: Colors.white70),
@@ -339,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Boutons d'action principaux
+          // 2. BOUTONS D'ACTION
           Row(
             children: [
               Expanded(
@@ -369,21 +441,262 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 20),
 
-          // Visuel central
-          Center(
-            child: Container(
-              height: 220,
-              width: double.infinity,
+          // 3. CALENDRIER DES SÉANCES RÉALISÉES
+          _buildCalendrierWidget(),
+
+          const SizedBox(height: 20),
+
+          // 4. SÉANCE OU PROGRAMME EN COURS
+          _buildCarteProgrammeEnCours(),
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGET CALENDRIER DES SÉANCES ---
+  Widget _buildCalendrierWidget() {
+    List<String> moisNoms = [
+      "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+    ];
+
+    int daysInMonth = DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
+    int firstWeekday = DateTime(_currentMonth.year, _currentMonth.month, 1).weekday; // 1 = Lundi, 7 = Dimanche
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Column(
+        children: [
+          // En-tête mois avec flèches
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left, color: Colors.white70),
+                onPressed: () {
+                  setState(() {
+                    _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+                  });
+                },
+              ),
+              Text(
+                "${moisNoms[_currentMonth.month - 1]} ${_currentMonth.year}",
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, color: Colors.white70),
+                onPressed: () {
+                  setState(() {
+                    _currentMonth = DateTime(_currentMonth.year, _currentMonthmonth + 1);
+                  });
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // En-tête des jours de la semaine
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+                .map((j) => SizedBox(
+                      width: 32,
+                      child: Center(
+                        child: Text(j, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+
+          // Grille du mois
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: (firstWeekday - 1) + daysInMonth,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+            ),
+            itemBuilder: (context, index) {
+              if (index < firstWeekday - 1) {
+                return const SizedBox.shrink(); // Cases vides du début de mois
+              }
+
+              int dayNumber = index - (firstWeekday - 1) + 1;
+              String dateKey = "${_currentMonth.year}-${_currentMonth.month.toString().padLeft(2, '0')}-${dayNumber.toString().padLeft(2, '0')}";
+              bool aAdesSeances = _sessionsParDate.containsKey(dateKey) && _sessionsParDate[dateKey]!.isNotEmpty;
+              bool isToday = DateTime.now().year == _currentMonth.year &&
+                  DateTime.now().month == _currentMonth.month &&
+                  DateTime.now().day == dayNumber;
+
+              return InkWell(
+                onTap: () {
+                  if (aAdesSeances) {
+                    _afficherDetailJour(dateKey, _sessionsParDate[dateKey]!);
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: aAdesSeances
+                        ? Colors.teal.withOpacity(0.3)
+                        : (isToday ? Colors.blueAccent.withOpacity(0.2) : Colors.transparent),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: aAdesSeances
+                          ? Colors.tealAccent
+                          : (isToday ? Colors.blueAccent : Colors.transparent),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Text(
+                        "$dayNumber",
+                        style: TextStyle(
+                          color: aAdesSeances ? Colors.white : (isToday ? Colors.blueAccent : Colors.white70),
+                          fontWeight: aAdesSeances || isToday ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (aAdesSeances)
+                        Positioned(
+                          bottom: 4,
+                          child: Container(
+                            width: 5,
+                            height: 5,
+                            decoration: const BoxDecoration(
+                              color: Colors.tealAccent,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGET SÉANCE OU PROGRAMME EN COURS ---
+  Widget _buildCarteProgrammeEnCours() {
+    if (_programmeEnCours == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.02),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                color: Colors.blueAccent.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: const Center(
-                child: Icon(Icons.fitness_center, size: 90, color: Colors.blueAccent),
+              child: const Icon(Icons.fitness_center, color: Colors.blueAccent),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Séance en cours", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  SizedBox(height: 2),
+                  Text("Aucun programme sélectionné", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                ],
               ),
+            ),
+            TextButton(
+              onPressed: _ouvrirSelectionProgramme,
+              child: const Text("Choisir", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+            )
+          ],
+        ),
+      );
+    }
+
+    List exosList = _programmeEnCours!['exercices'] ?? [];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.blueAccent.withOpacity(0.15), Colors.indigo.withOpacity(0.15)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.play_circle_fill, color: Colors.blueAccent, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    "PROGRAMME EN COURS",
+                    style: TextStyle(color: Colors.blueAccent.shade100, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blueAccent.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  "${exosList.length} exos",
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              )
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _programmeEnCours!['nom'] ?? 'Programme',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () {
+                List<ExerciseModel> exos = exosList.map((e) => ExerciseModel.fromJson(e)).toList();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => SessionRunnerScreen(exercices: exos, isProgramme: true)),
+                ).then((_) => _chargerDonneesCalendrierEtProgramme());
+              },
+              icon: const Icon(Icons.play_arrow, size: 20),
+              label: const Text("Continuer la séance", style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -485,12 +798,8 @@ class _ChronoBottomSheetState extends State<ChronoBottomSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(2),
-            ),
+            width: 40, height: 4,
+            decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
           ),
           const SizedBox(height: 20),
           const Text(
@@ -498,14 +807,11 @@ class _ChronoBottomSheetState extends State<ChronoBottomSheet> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueAccent),
           ),
           const SizedBox(height: 24),
-
-          // Horloge circulaire
           Stack(
             alignment: Alignment.center,
             children: [
               SizedBox(
-                width: 180,
-                height: 180,
+                width: 180, height: 180,
                 child: CircularProgressIndicator(
                   value: progress,
                   strokeWidth: 8,
@@ -529,11 +835,8 @@ class _ChronoBottomSheetState extends State<ChronoBottomSheet> {
             ],
           ),
           const SizedBox(height: 28),
-
-          // Choix pré-définis
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: 10, runSpacing: 10,
             alignment: WrapAlignment.center,
             children: [
               _buildPresetChip("30s", 30),
@@ -545,8 +848,6 @@ class _ChronoBottomSheetState extends State<ChronoBottomSheet> {
             ],
           ),
           const SizedBox(height: 28),
-
-          // Contrôles
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
