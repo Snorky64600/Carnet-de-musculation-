@@ -69,24 +69,43 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _syncBpm() async {
+    Future<void> _syncBpm() async {
     setState(() => _isSyncingBpm = true);
     try {
       final health = Health();
-      bool authorized = await health.requestAuthorization([HealthDataType.HEART_RATE]);
-      if (authorized) {
-        List<HealthDataPoint> data = await health.getHealthDataFromTypes(
-          types: [HealthDataType.HEART_RATE],
-          startTime: DateTime.now().subtract(const Duration(minutes: 5)),
-          endTime: DateTime.now(),
+      
+      // Force l'utilisation exclusive de Santé Connect (bloque le secours vers Google Fit / Google Sign-In)
+      health.configure();
+
+      // Vérifie si le module Santé Connect natif d'Android est prêt
+      HealthConnectSdkStatus? status = await health.getHealthConnectSdkStatus();
+      
+      if (status == HealthConnectSdkStatus.sdkAvailable) {
+        // Demande d'autorisation directe auprès du système Android
+        bool authorized = await health.requestAuthorization(
+          [HealthDataType.HEART_RATE],
+          permissions: [HealthDataAccess.READ],
         );
-        if (data.isNotEmpty && data.last.value is NumericHealthValue) {
-          setState(() {
-            _bpm = (data.last.value as NumericHealthValue).numericValue.toInt();
-          });
+
+        if (authorized) {
+          List<HealthDataPoint> data = await health.getHealthDataFromTypes(
+            types: [HealthDataType.HEART_RATE],
+            startTime: DateTime.now().subtract(const Duration(minutes: 10)),
+            endTime: DateTime.now(),
+          );
+          
+          if (data.isNotEmpty && data.last.value is NumericHealthValue) {
+            setState(() {
+              _bpm = (data.last.value as NumericHealthValue).numericValue.toInt();
+            });
+          }
         }
+      } else {
+        // Si Santé Connect n'est pas encore activé sur le téléphone
+        await health.installHealthConnect();
       }
     } catch (_) {}
+    
     if (mounted) {
       setState(() => _isSyncingBpm = false);
     }
