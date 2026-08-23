@@ -92,10 +92,11 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
         permissions: [HealthDataAccess.READ_WRITE],
       );
       if (authorized) {
+        // CORRECTION DE L'ERREUR DE COMPILATION ICI (Ajout des paramètres nommés)
         await health.writeWorkoutData(
-          HealthWorkoutActivityType.STRENGTH_TRAINING,
-          _sessionStartTime,
-          DateTime.now(),
+          activityType: HealthWorkoutActivityType.STRENGTH_TRAINING,
+          start: _sessionStartTime,
+          end: DateTime.now(),
           title: title,
         );
       }
@@ -118,7 +119,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
 
     _exportToHealthConnect(widget.exercices[_currentIndex].nom);
   }
-
   @override
   Widget build(BuildContext context) {
     final exo = widget.exercices[_currentIndex];
