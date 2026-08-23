@@ -19,12 +19,10 @@ class SessionRunnerScreen extends StatefulWidget {
 class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   int _currentIndex = 0;
   final PageController _pageController = PageController();
-  int? _bpm;
-  
-  // Gestion des séries
+  final DateTime _sessionStartTime = DateTime.now();
+
   List<Map<String, dynamic>> _seriesList = [];
 
-  // Chrono de repos intégré
   int _selectedRestSeconds = 90;
   int? _restTimeRemaining;
   Timer? _restTimer;
@@ -34,7 +32,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   void initState() {
     super.initState();
     _reinitialiserSeries();
-    _startBpmMonitoring();
   }
 
   @override
@@ -49,26 +46,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     ];
   }
 
-  void _startBpmMonitoring() async {
-    try {
-      final health = Health();
-      if (await health.requestAuthorization([HealthDataType.HEART_RATE])) {
-        Timer.periodic(const Duration(seconds: 15), (timer) async {
-          if (!mounted) return;
-          var data = await health.getHealthDataFromTypes(
-            types: [HealthDataType.HEART_RATE],
-            startTime: DateTime.now().subtract(const Duration(minutes: 5)),
-            endTime: DateTime.now(),
-          );
-          if (data.isNotEmpty && data.last.value is NumericHealthValue) {
-            setState(() => _bpm = (data.last.value as NumericHealthValue).numericValue.toInt());
-          }
-        });
-      }
-    } catch (_) {}
-  }
-
-  // --- Gestion du Chrono de Repos ---
   void _lancerRepos(int seconds) {
     _restTimer?.cancel();
     setState(() {
@@ -82,7 +59,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       if (_restTimeRemaining != null && _restTimeRemaining! > 0) {
         setState(() => _restTimeRemaining = _restTimeRemaining! - 1);
       } else {
-        HapticFeedback.heavyImpact(); // Vibration forte de fin de repos
+        HapticFeedback.heavyImpact();
         _restTimer?.cancel();
         setState(() {
           _isResting = false;
@@ -106,6 +83,25 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
+  Future<void> _exportToHealthConnect(String title) async {
+    try {
+      final health = Health();
+      health.configure();
+      bool authorized = await health.requestAuthorization(
+        [HealthDataType.WORKOUT],
+        permissions: [HealthDataAccess.READ_WRITE],
+      );
+      if (authorized) {
+        await health.writeWorkoutData(
+          HealthWorkoutActivityType.STRENGTH_TRAINING,
+          _sessionStartTime,
+          DateTime.now(),
+          title: title,
+        );
+      }
+    } catch (_) {}
+  }
+
   Future<void> _saveSession() async {
     List<Map<String, dynamic>> formatted = _seriesList.map((s) => {
       'poids': s['poids'].text,
@@ -119,6 +115,8 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       'exercice': widget.exercices[_currentIndex].nom,
       'series': formatted,
     });
+
+    _exportToHealthConnect(widget.exercices[_currentIndex].nom);
   }
 
   @override
@@ -129,23 +127,11 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       appBar: AppBar(
         title: Text(exo.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                const Icon(Icons.favorite, color: Colors.redAccent, size: 20),
-                const SizedBox(width: 6),
-                Text(_bpm != null ? "$_bpm" : "--", style: const TextStyle(fontWeight: FontWeight.bold)),
-              ],
-            ),
-          )
-        ],
       ),
       body: PageView(
         controller: _pageController,
         children: [
-          // PAGE 1 : Visuel & Description
+          // PAGE 1 : Visuel & Consignes
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -168,12 +154,11 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
             ),
           ),
 
-          // PAGE 2 : Enregistrement des Séries & Chrono de Repos intégré
+          // PAGE 2 : Enregistrement des Séries
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // BLOC CHRONO DE RÉCUPÉRATION (Style Sweat)
                 Container(
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 12),
@@ -229,7 +214,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                   ),
                 ),
 
-                // LISTE DES SÉRIES
                 Expanded(
                   child: ListView.builder(
                     itemCount: _seriesList.length,
@@ -296,7 +280,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
             ),
           ),
 
-          // PAGE 3 : Historique de l'exercice
+          // PAGE 3 : Historique
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -340,4 +324,3 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     );
   }
 }
-
