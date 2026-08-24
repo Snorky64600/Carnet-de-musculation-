@@ -1,375 +1,245 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../helpers/database_helper.dart';
 
-class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({Key? key}) : super(key: key);
+class HistoriqueScreen extends StatefulWidget {
+  const HistoriqueScreen({Key? key}) : super(key: key);
+
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
+  State<HistoriqueScreen> createState() => _HistoriqueScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
-  String filtreExercice = 'Tous les exercices';
-  String _searchQuery = '';
+class _HistoriqueScreenState extends State<HistoriqueScreen> {
+  List<Map<String, dynamic>> _historiquePropre = [];
 
-  String _nettoyerNom(String nomExercice) {
-    return nomExercice.replaceAll(' (par côté)', '').trim();
+  @override
+  void initState() {
+    super.initState();
+    _chargerHistorique();
+  }
+
+  void _chargerHistorique() {
+    // Regroupement par Date + Exercice pour écraser les sauvegardes partielles
+    Map<String, Map<String, dynamic>> dedup = {};
+    for (var session in DatabaseHelper.instance.sessionsSauvegardees) {
+      String key = "${session['date']}_${session['exercice']}";
+      dedup[key] = session; // La dernière sauvegarde écrase les précédentes de la même journée
+    }
+
+    _historiquePropre = dedup.values.toList();
+    // Tri du plus récent au plus ancien
+    _historiquePropre.sort((a, b) => (b['date'] ?? '').compareTo(a['date'] ?? ''));
+    setState(() {});
+  }
+
+  void _afficherGraphique(String nomExercice) {
+    // Récupérer toutes les sessions uniques de cet exercice
+    Map<String, Map<String, dynamic>> dedup = {};
+    for (var s in DatabaseHelper.instance.sessionsSauvegardees) {
+      if (s['exercice'] == nomExercice) {
+        dedup[s['date']] = s;
+      }
+    }
+    
+    List<Map<String, dynamic>> sessionsExo = dedup.values.toList();
+    sessionsExo.sort((a, b) => (a['date'] ?? '').compareTo(b['date'] ?? '')); // Chronologique
+
+    List<double> maxWeights = [];
+    List<String> dates = [];
+
+    for (var s in sessionsExo) {
+      double maxW = 0;
+      for (var serie in (s['series'] as List)) {
+        double w = double.tryParse(serie['poids'].toString()) ?? 0;
+        if (w > maxW) maxW = w;
+      }
+      maxWeights.add(maxW);
+      dates.add(s['date'].toString().substring(5)); // Format MM-DD
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 20),
+            Text("Évolution : $nomExercice", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            const Text("Charge maximale soulevée (kg)", style: TextStyle(color: Colors.grey, fontSize: 13)),
+            const SizedBox(height: 30),
+            
+            if (maxWeights.length < 2)
+              const Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Text("Fais au moins 2 séances différentes pour voir ton évolution !", style: TextStyle(color: Colors.blueAccent), textAlign: TextAlign.center),
+              )
+            else
+              SizedBox(
+                height: 200,
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: LineChartPainter(maxWeights),
+                ),
+              ),
+            
+            const SizedBox(height: 10),
+            if (maxWeights.length >= 2)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(dates.first, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(dates.last, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                ],
+              ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<String> optionsFiltre = [
-      'Tous les exercices',
-      ...DatabaseHelper.instance.exercicesDisponibles.map((e) => e.nom)
-    ];
-
-    final toutesLesSessions = DatabaseHelper.instance.sessionsSauvegardees;
-    
-    // Filtrage combiné par recherche textuelle et par exercice sélectionné
-    final sessionsFiltreesAvecIndex = <MapEntry<int, Map<String, dynamic>>>[];
-    for (int i = 0; i < toutesLesSessions.length; i++) {
-      final s = toutesLesSessions[i];
-      final nomExo = s['exercice']?.toString() ?? '';
-      
-      bool matchFiltre = filtreExercice == 'Tous les exercices' || 
-          _nettoyerNom(nomExo) == _nettoyerNom(filtreExercice);
-          
-      bool matchRecherche = _searchQuery.isEmpty || 
-          nomExo.toLowerCase().contains(_searchQuery.toLowerCase());
-
-      if (matchFiltre && matchRecherche) {
-        sessionsFiltreesAvecIndex.add(MapEntry(i, s));
-      }
-    }
-
-    double maxPoidsGlobal = 0;
-    double meilleur1RMGlobal = 0;
-    double maxVolumeGlobal = 0;
-    List<BarChartRodData> barRods = [];
-    List<String> datesLabels = [];
-
-    if (filtreExercice != 'Tous les exercices') {
-      final sessionsChronologiques = sessionsFiltreesAvecIndex.reversed.toList();
-      for (var item in sessionsChronologiques) {
-        final s = item.value;
-        final List seriesList = s['series'] ?? [];
-        double maxPoidsSession = 0;
-        double max1RMSession = 0;
-        double volumeSession = 0;
-
-        for (var serie in seriesList) {
-          final mapSerie = Map<String, dynamic>.from(serie as Map);
-          double p = double.tryParse(mapSerie['poids'].toString()) ?? 0;
-          double r = double.tryParse(mapSerie['reps'].toString()) ?? 0;
-          
-          if (p > maxPoidsSession) maxPoidsSession = p;
-          if (p > maxPoidsGlobal) maxPoidsGlobal = p;
-
-          if (p > 0 && r > 0) {
-            double epley = p * (1 + r / 30.0);
-            if (epley > max1RMSession) max1RMSession = epley;
-            if (epley > meilleur1RMGlobal) meilleur1RMGlobal = epley;
-          }
-          volumeSession += (p * r);
-        }
-
-        if (volumeSession > maxVolumeGlobal) {
-          maxVolumeGlobal = volumeSession;
-        }
-
-        barRods.add(
-          BarChartRodData(
-            toY: max1RMSession > 0 ? max1RMSession : maxPoidsSession,
-            color: const Color(0xFF38BDF8),
-            width: 14,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-          ),
-        );
-        datesLabels.add(s['date'].toString().substring(5, 10));
-      }
-
-      if (barRods.isNotEmpty) {
-        double maxY = barRods.map((e) => e.toY).reduce((a, b) => a > b ? a : b);
-        for (int i = 0; i < barRods.length; i++) {
-          if (barRods[i].toY == maxY && maxY > 0) {
-            barRods[i] = barRods[i].copyWith(color: Colors.amber);
-          }
-        }
-      }
-    }
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Historique & Progression'), backgroundColor: Colors.transparent),
-      body: Column(
-        children: [
-          // Barre de recherche textuelle
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Rechercher dans l\'historique...',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF38BDF8)),
-                filled: true,
-                fillColor: Theme.of(context).cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-          // Menu déroulant de filtre par exercice
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: DropdownButtonFormField<String>(
-              value: optionsFiltre.contains(filtreExercice) ? filtreExercice : 'Tous les exercices',
-              dropdownColor: Theme.of(context).cardColor,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'Filtrer par exercice',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                filled: true,
-                fillColor: Theme.of(context).cardColor,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              items: optionsFiltre.map((String nom) {
-                return DropdownMenuItem<String>(
-                  value: nom,
-                  child: Text(nom),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                HapticFeedback.selectionClick();
-                if (newValue != null) {
-                  setState(() => filtreExercice = newValue);
-                }
-              },
-            ),
-          ),
-          if (filtreExercice != 'Tous les exercices') ...[
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF38BDF8),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('MEILLEUR 1RM', style: TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Text('${meilleur1RMGlobal.toStringAsFixed(1)} kg', style: const TextStyle(fontSize: 16, color: Colors.black, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('POIDS MAX', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Text('${maxPoidsGlobal.toStringAsFixed(0)} kg', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('VOLUME MAX', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Text('${maxVolumeGlobal.toStringAsFixed(0)} kg', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      appBar: AppBar(
+        title: const Text("Historique", style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: _historiquePropre.isEmpty
+          ? const Center(child: Text("Aucune séance enregistrée.", style: TextStyle(color: Colors.grey)))
+          : ListView.builder(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('1RM (kg)', style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  barRods.isEmpty
-                      ? const Text('Pas assez de données pour le graphique', style: TextStyle(color: Colors.grey, fontSize: 12))
-                      : SizedBox(
-                          height: 160,
-                          child: BarChart(
-                            BarChartData(
-                              alignment: BarChartAlignment.spaceAround,
-                              gridData: const FlGridData(show: false),
-                              titlesData: FlTitlesData(
-                                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                bottomTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    getTitlesWidget: (value, meta) {
-                                      int idx = value.toInt();
-                                      if (idx >= 0 && idx < datesLabels.length) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(top: 6.0),
-                                          child: Text(datesLabels[idx], style: const TextStyle(fontSize: 9, color: Colors.grey)),
-                                        );
-                                      }
-                                      return const Text('');
-                                    },
+              itemCount: _historiquePropre.length,
+              itemBuilder: (context, index) {
+                final session = _historiquePropre[index];
+                List series = session['series'] ?? [];
+
+                return Card(
+                  color: Colors.white.withOpacity(0.05),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      iconColor: Colors.blueAccent,
+                      collapsedIconColor: Colors.grey,
+                      title: Text(session['exercice'] ?? 'Exercice', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                      subtitle: Text("Date : ${session['date']} • ${series.length} séries", style: const TextStyle(color: Colors.tealAccent, fontSize: 13)),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ...series.asMap().entries.map((entry) {
+                                int i = entry.key;
+                                var s = entry.value;
+                                bool echec = s['echec'] == true;
+                                bool unilateral = s['unilateral'] == true;
+
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.03),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                ),
-                              ),
-                              borderData: FlBorderData(show: false),
-                              barGroups: List.generate(barRods.length, (i) => BarChartGroupData(
-                                x: i,
-                                barRods: [barRods[i]],
-                              )),
-                            ),
-                          ),
-                        ),
-                ],
-              ),
-            ),
-          ],
-          Expanded(
-            child: sessionsFiltreesAvecIndex.isEmpty
-                ? const Center(child: Text('Aucune séance enregistrée', style: TextStyle(color: Colors.grey)))
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: sessionsFiltreesAvecIndex.length,
-                    itemBuilder: (context, index) {
-                      final itemReel = sessionsFiltreesAvecIndex[index];
-                      final int indexGlobal = itemReel.key;
-                      final s = itemReel.value;
-                      final List seriesList = s['series'] ?? [];
-                      final String nomExoBrut = s['exercice'];
-                      final String nomExoNettoye = _nettoyerNom(nomExoBrut);
-
-                      bool estPoidsMaxSeance = false;
-                      for (var serie in seriesList) {
-                        double p = double.tryParse(serie['poids'].toString()) ?? 0;
-                        if (p >= maxPoidsGlobal && maxPoidsGlobal > 0) estPoidsMaxSeance = true;
-                      }
-
-                      return GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() {
-                            if (optionsFiltre.contains(nomExoNettoye)) {
-                              filtreExercice = nomExoNettoye;
-                            } else {
-                              filtreExercice = nomExoBrut;
-                            }
-                          });
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardColor,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(nomExoBrut,
-                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8))),
-                                    ),
-                                    Text(s['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                    const SizedBox(width: 8),
-                                    InkWell(
-                                      onTap: () async {
-                                        HapticFeedback.mediumImpact();
-                                        await DatabaseHelper.instance.supprimerSeance(indexGlobal);
-                                        setState(() {});
-                                      },
-                                      child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
-                                    ),
-                                  ],
-                                ),
-                                const Divider(color: Colors.white12, height: 16),
-                                ...List.generate(seriesList.length, (i) {
-                                  final serie = seriesList[i];
-                                  final p = serie['poids']?.toString() ?? '0';
-                                  final r = serie['reps']?.toString() ?? '0';
-                                  final rpe = serie['rpe']?.toString() ?? '';
-                                  final isEchec = serie['echec'] == true || serie['echec'] == 'true';
-                                  
-                                  double pVal = double.tryParse(p) ?? 0;
-                                  double rVal = double.tryParse(r) ?? 0;
-                                  double rmSerie = pVal > 0 && rVal > 0 ? pVal * (1 + rVal / 30.0) : 0;
-
-                                  String details = '$p kg × $r reps';
-                                  if (rpe.isNotEmpty) details += ' (RPE $rpe)';
-                                  if (isEchec) details += ' 💥 Échec';
-                                  if (rmSerie > 0) details += '  •  1RM: ${rmSerie.toStringAsFixed(1)}';
-
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
-                                    child: Text(details, style: const TextStyle(fontSize: 13, color: Colors.white70)),
-                                  );
-                                }),
-                                if (estPoidsMaxSeance) ...[
-                                  const SizedBox(height: 8),
-                                  Row(
+                                  child: Row(
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.redAccent),
+                                      Text("S${i + 1}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 13)),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: Text("${s['poids']} kg", style: const TextStyle(color: Colors.white))),
+                                      Expanded(child: Text("${s['reps']} reps", style: const TextStyle(color: Colors.white))),
+                                      if (unilateral)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(color: Colors.teal.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
+                                          child: const Text("Uni", style: TextStyle(color: Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                                         ),
-                                        child: const Text('POIDS MAX 🔴', style: TextStyle(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                                      ),
+                                      const SizedBox(width: 6),
+                                      if (echec)
+                                        const Icon(Icons.flag, color: Colors.redAccent, size: 16),
                                     ],
                                   ),
-                                ]
-                              ],
-                            ),
+                                );
+                              }).toList(),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: Colors.blueAccent.withOpacity(0.5)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                onPressed: () => _afficherGraphique(session['exercice']),
+                                icon: const Icon(Icons.show_chart, color: Colors.blueAccent),
+                                label: const Text("Voir l'évolution", style: TextStyle(color: Colors.blueAccent)),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
                           ),
-                        ),
-                      );
-                    },
+                        )
+                      ],
+                    ),
                   ),
-          ),
-        ],
-      ),
+                );
+              },
+            ),
     );
   }
+}
+
+// Peintre personnalisé pour dessiner le graphique sans aucun plugin externe
+class LineChartPainter extends CustomPainter {
+  final List<double> data;
+  LineChartPainter(this.data);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (data.isEmpty) return;
+    
+    final paintLine = Paint()..color = Colors.tealAccent..strokeWidth = 3..style = PaintingStyle.stroke..strokeCap = StrokeCap.round;
+    final paintPoint = Paint()..color = Colors.blueAccent..style = PaintingStyle.fill;
+
+    double maxVal = data.reduce(max);
+    double minVal = data.reduce(min);
+    
+    if (maxVal == minVal) {
+      maxVal += 10;
+      minVal = minVal > 10 ? minVal - 10 : 0;
+    }
+
+    double range = maxVal - minVal;
+    double xStep = data.length > 1 ? size.width / (data.length - 1) : size.width / 2;
+
+    Path path = Path();
+    for (int i = 0; i < data.length; i++) {
+      double x = data.length > 1 ? i * xStep : xStep;
+      double y = size.height - ((data[i] - minVal) / range) * size.height;
+      if (i == 0) path.moveTo(x, y);
+      else path.lineTo(x, y);
+    }
+    
+    canvas.drawPath(path, paintLine);
+
+    for (int i = 0; i < data.length; i++) {
+      double x = data.length > 1 ? i * xStep : xStep;
+      double y = size.height - ((data[i] - minVal) / range) * size.height;
+      canvas.drawCircle(Offset(x, y), 6, paintPoint);
+      canvas.drawCircle(Offset(x, y), 3, Paint()..color = Colors.white);
+      
+      // Texte du poids au-dessus du point
+      TextSpan span = TextSpan(style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), text: "${data[i].toInt()}");
+      TextPainter tp = TextPainter(text: span, textAlign: TextAlign.center, textDirection: TextDirection.ltr);
+      tp.layout();
+      tp.paint(canvas, Offset(x - (tp.width / 2), y - 20));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
