@@ -44,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ExerciseModel _getExerciseModel(String nomExo) {
     return DatabaseHelper.instance.exercicesDisponibles.firstWhere(
       (e) => e.nom.toLowerCase() == nomExo.toLowerCase(),
-      orElse: () => ExerciseModel(id: nomExo, nom: nomExo, steps: [], images: [], tags: []),
+      orElse: () => ExerciseModel(nom: nomExo, steps: [], images: [], tags: []),
     );
   }
 
@@ -472,7 +472,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCarteProgrammeEnCours() {
     String today = DateTime.now().toString().split(' ')[0];
     
-    // Récupération de tous les exercices enregistrés aujourd'hui
     List<Map<String, dynamic>> sessionsAujourdhui = DatabaseHelper.instance.sessionsSauvegardees
         .where((s) => s['date'] == today)
         .toList();
