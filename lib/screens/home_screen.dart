@@ -18,7 +18,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   DateTime _currentMonth = DateTime.now();
   Map<String, List<Map<String, dynamic>>> _sessionsParDate = {};
-  Map<String, dynamic>? _programmeEnCours;
 
   @override
   void initState() {
@@ -26,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _chargerDonneesCalendrierEtProgramme();
   }
 
-  void _chargerDonneesCalendrierEtProgramme() async {
+  void _chargerDonneesCalendrierEtProgramme() {
     Map<String, List<Map<String, dynamic>>> groupe = {};
     for (var session in DatabaseHelper.instance.sessionsSauvegardees) {
       String dateKey = session['date'] ?? '';
@@ -35,20 +34,18 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final String? progEnCoursStr = prefs.getString('programme_en_cours');
-    Map<String, dynamic>? progEnCours;
-    if (progEnCoursStr != null) {
-      progEnCours = jsonDecode(progEnCoursStr);
-    }
-    // Suppression du fallback automatique : n'affiche rien tant qu'on n'a pas cliqué sur Enregistrer
-
     if (mounted) {
       setState(() {
         _sessionsParDate = groupe;
-        _programmeEnCours = progEnCours;
       });
     }
+  }
+
+  ExerciseModel _getExerciseModel(String nomExo) {
+    return DatabaseHelper.instance.exercicesDisponibles.firstWhere(
+      (e) => e.nom.toLowerCase() == nomExo.toLowerCase(),
+      orElse: () => ExerciseModel(id: nomExo, nom: nomExo, steps: [], images: [], tags: []),
+    );
   }
 
   void _afficherDetailJour(String dateFormatted, List<Map<String, dynamic>> sessions) {
@@ -306,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => const ChronoBottomSheet(),
     );
   }
-  @override
+    @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -473,7 +470,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCarteProgrammeEnCours() {
-    if (_programmeEnCours == null) {
+    String today = DateTime.now().toString().split(' ')[0];
+    
+    // Récupération de tous les exercices enregistrés aujourd'hui
+    List<Map<String, dynamic>> sessionsAujourdhui = DatabaseHelper.instance.sessionsSauvegardees
+        .where((s) => s['date'] == today)
+        .toList();
+
+    if (sessionsAujourdhui.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -507,66 +511,65 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    String nom = _programmeEnCours!['nom'] ?? 'Séance';
-    List seriesList = _programmeEnCours!['series'] ?? [];
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.blueAccent.withOpacity(0.15), Colors.indigo.withOpacity(0.15)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            "EXERCICE(S) EN COURS AUJOURD'HUI (${sessionsAujourdhui.length})",
+            style: TextStyle(color: Colors.blueAccent.shade100, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          ),
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+        ...sessionsAujourdhui.map((session) {
+          String nom = session['exercice'] ?? 'Exercice';
+          List seriesList = session['series'] ?? [];
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blueAccent.withOpacity(0.15), Colors.indigo.withOpacity(0.15)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              title: Text(nom, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              subtitle: Text("${seriesList.length} série(s) enregistrée(s)", style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.play_circle_fill, color: Colors.blueAccent, size: 22),
+                  const Icon(Icons.play_circle_fill, color: Colors.blueAccent, size: 28),
                   const SizedBox(width: 8),
-                  Text(
-                    "DERNIER EXERCICE ENREGISTRÉ",
-                    style: TextStyle(color: Colors.blueAccent.shade100, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.grey, size: 20),
+                    tooltip: "Supprimer cet exercice",
+                    onPressed: () {
+                      setState(() {
+                        DatabaseHelper.instance.sessionsSauvegardees.removeWhere(
+                          (s) => s['date'] == today && s['exercice'] == nom,
+                        );
+                      });
+                      _chargerDonneesCalendrierEtProgramme();
+                    },
                   ),
                 ],
               ),
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.grey, size: 20),
-                tooltip: "Supprimer / Ne pas garder",
-                onPressed: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.remove('programme_en_cours');
-                  
-                  // Supprime également de l'historique de la base de données locale si on ne souhaite pas le garder
-                  String today = DateTime.now().toString().split(' ')[0];
-                  DatabaseHelper.instance.sessionsSauvegardees.removeWhere((s) => s['date'] == today && s['exercice'] == nom);
-                  
-                  _chargerDonneesCalendrierEtProgramme();
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            nom,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
-          if (seriesList.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              "${seriesList.length} série(s) enregistrée(s)",
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
+              onTap: () {
+                ExerciseModel exo = _getExerciseModel(nom);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => SessionRunnerScreen(exercices: [exo])),
+                ).then((_) => _chargerDonneesCalendrierEtProgramme());
+              },
             ),
-          ],
-        ],
-      ),
+          );
+        }).toList(),
+      ],
     );
   }
 }
