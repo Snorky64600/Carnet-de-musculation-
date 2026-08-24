@@ -42,7 +42,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
 
   void _reinitialiserSeries() {
     _seriesList = [
-      {'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false}
+      {'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false, 'unilateral': false}
     ];
   }
 
@@ -87,18 +87,24 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     try {
       final health = Health();
       health.configure();
-      bool authorized = await health.requestAuthorization(
-        [HealthDataType.WORKOUT],
-        permissions: [HealthDataAccess.READ_WRITE],
-      );
-      if (authorized) {
-        // CORRECTION DE L'ERREUR DE COMPILATION ICI (Ajout des paramètres nommés)
-        await health.writeWorkoutData(
-          activityType: HealthWorkoutActivityType.STRENGTH_TRAINING,
-          start: _sessionStartTime,
-          end: DateTime.now(),
-          title: title,
+
+      // C'EST ICI LA CORRECTION : on vérifie que Santé Connect est actif
+      // avant de demander l'autorisation, pour bloquer le repli vers Google Fit.
+      var status = await health.getHealthConnectSdkStatus();
+      
+      if (status == HealthConnectSdkStatus.sdkAvailable) {
+        bool authorized = await health.requestAuthorization(
+          [HealthDataType.WORKOUT],
+          permissions: [HealthDataAccess.READ_WRITE],
         );
+        if (authorized) {
+          await health.writeWorkoutData(
+            activityType: HealthWorkoutActivityType.STRENGTH_TRAINING,
+            start: _sessionStartTime,
+            end: DateTime.now(),
+            title: title,
+          );
+        }
       }
     } catch (_) {}
   }
@@ -109,6 +115,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       'reps': s['reps'].text,
       'rpe': s['rpe'].text,
       'echec': s['echec'],
+      'unilateral': s['unilateral'] ?? false,
     }).toList();
 
     await DatabaseHelper.instance.ajouterSeance({
@@ -119,7 +126,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
 
     _exportToHealthConnect(widget.exercices[_currentIndex].nom);
   }
-  @override
+    @override
   Widget build(BuildContext context) {
     final exo = widget.exercices[_currentIndex];
 
@@ -214,7 +221,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                   ),
                 ),
 
-                                Expanded(
+                Expanded(
                   child: ListView.builder(
                     itemCount: _seriesList.length,
                     itemBuilder: (context, i) => Card(
@@ -258,7 +265,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                   ),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => setState(() => _seriesList.add({'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false})),
+                  onPressed: () => setState(() => _seriesList.add({'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false, 'unilateral': false})),
                   icon: const Icon(Icons.add),
                   label: const Text("Ajouter une série"),
                 ),
