@@ -33,7 +33,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   @override
   void initState() {
     super.initState();
-    _reinitialiserSeries();
+    _chargerOuReinitialiserSeries();
   }
 
   @override
@@ -42,10 +42,29 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     super.dispose();
   }
 
-  void _reinitialiserSeries() {
-    _seriesList = [
-      {'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false, 'unilateral': false}
-    ];
+  void _chargerOuReinitialiserSeries() {
+    String today = DateTime.now().toString().split(' ')[0];
+    String currentExoNom = widget.exercices[_currentIndex].nom;
+
+    // Recherche si une séance existe déjà aujourd'hui pour cet exercice
+    var existingList = DatabaseHelper.instance.sessionsSauvegardees.where(
+      (s) => s['date'] == today && s['exercice'] == currentExoNom
+    ).toList();
+
+    if (existingList.isNotEmpty && existingList.last['series'] != null) {
+      List seriesData = existingList.last['series'];
+      _seriesList = seriesData.map((s) => {
+        'poids': TextEditingController(text: s['poids']?.toString() ?? ''),
+        'reps': TextEditingController(text: s['reps']?.toString() ?? ''),
+        'rpe': TextEditingController(text: s['rpe']?.toString() ?? ''),
+        'echec': s['echec'] == true,
+        'unilateral': s['unilateral'] == true,
+      }).toList();
+    } else {
+      _seriesList = [
+        {'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false, 'unilateral': false}
+      ];
+    }
   }
 
   void _lancerRepos(int seconds) {
@@ -89,9 +108,8 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     try {
       final health = Health();
       health.configure();
-
-      // Vérifie que Santé Connect est disponible pour éviter le repli sur Google Fit
       var status = await health.getHealthConnectSdkStatus();
+      
       if (status == HealthConnectSdkStatus.sdkAvailable) {
         bool authorized = await health.requestAuthorization(
           [HealthDataType.WORKOUT],
@@ -118,19 +136,28 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       'unilateral': s['unilateral'] ?? false,
     }).toList();
 
+    String today = DateTime.now().toString().split(' ')[0];
+    String currentExoNom = widget.exercices[_currentIndex].nom;
+
+    // Supprime l'enregistrement précédent du jour pour éviter les doublons
+    DatabaseHelper.instance.sessionsSauvegardees.removeWhere(
+      (s) => s['date'] == today && s['exercice'] == currentExoNom
+    );
+
+    // Enregistre la séance complète mise à jour
     await DatabaseHelper.instance.ajouterSeance({
-      'date': DateTime.now().toString().split(' ')[0],
-      'exercice': widget.exercices[_currentIndex].nom,
+      'date': today,
+      'exercice': currentExoNom,
       'series': formatted,
     });
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('programme_en_cours', jsonEncode({
-      'nom': widget.exercices[_currentIndex].nom,
+      'nom': currentExoNom,
       'series': formatted,
     }));
 
-    _exportToHealthConnect(widget.exercices[_currentIndex].nom);
+    _exportToHealthConnect(currentExoNom);
   }
     @override
   Widget build(BuildContext context) {
@@ -246,7 +273,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                           Expanded(child: TextField(controller: _seriesList[i]['rpe'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'RPE', isDense: true))),
                           const SizedBox(width: 4),
                           
-                          // Bouton Unilatéral (Uni)
+                          // Bouton Unilatéral
                           GestureDetector(
                             onTap: () => setState(() => _seriesList[i]['unilateral'] = !(_seriesList[i]['unilateral'] ?? false)),
                             child: Container(
@@ -295,7 +322,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                         if (_currentIndex < widget.exercices.length - 1) {
                           setState(() {
                             _currentIndex++;
-                            _reinitialiserSeries();
+                            _chargerOuReinitialiserSeries();
                           });
                           _pageController.jumpToPage(0);
                         } else {
