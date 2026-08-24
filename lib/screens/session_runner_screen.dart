@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:health/health.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/exercise_model.dart';
 import '../widgets/media_widget.dart';
 import '../helpers/database_helper.dart';
@@ -87,9 +89,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     try {
       final health = Health();
       health.configure();
-
-      // C'EST ICI LA CORRECTION : on vérifie que Santé Connect est actif
-      // avant de demander l'autorisation, pour bloquer le repli vers Google Fit.
       var status = await health.getHealthConnectSdkStatus();
       
       if (status == HealthConnectSdkStatus.sdkAvailable) {
@@ -109,7 +108,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     } catch (_) {}
   }
 
-    Future<void> _saveSession() async {
+  Future<void> _saveSession() async {
     List<Map<String, dynamic>> formatted = _seriesList.map((s) => {
       'poids': s['poids'].text,
       'reps': s['reps'].text,
@@ -124,7 +123,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       'series': formatted,
     });
 
-    // Enregistre l'exercice dans "programme_en_cours" pour qu'il apparaisse sur l'accueil
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('programme_en_cours', jsonEncode({
       'nom': widget.exercices[_currentIndex].nom,
@@ -133,7 +131,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
 
     _exportToHealthConnect(widget.exercices[_currentIndex].nom);
   }
-
     @override
   Widget build(BuildContext context) {
     final exo = widget.exercices[_currentIndex];
@@ -356,3 +353,5 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     );
   }
 }
+
+  
