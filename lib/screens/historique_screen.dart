@@ -24,13 +24,109 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
     Map<String, Map<String, dynamic>> dedup = {};
     for (var session in DatabaseHelper.instance.sessionsSauvegardees) {
       String key = "${session['date']}_${session['exercice']}";
-      dedup[key] = session; // La dernière sauvegarde de la journée écrase les précédentes
+      dedup[key] = session; // La dernière sauvegarde écrase les précédentes de la même journée
     }
 
     _historiquePropre = dedup.values.toList();
     // Tri du plus récent au plus ancien
     _historiquePropre.sort((a, b) => (b['date'] ?? '').compareTo(a['date'] ?? ''));
     setState(() {});
+  }
+
+  void _editerSession(Map<String, dynamic> session) {
+    // Création d'une copie des séries pour l'édition
+    List<Map<String, dynamic>> editSeries = List.generate(
+      (session['series'] as List).length,
+      (index) => Map<String, dynamic>.from(session['series'][index])
+    );
+
+    List<TextEditingController> poidsCtrls = editSeries.map((s) => TextEditingController(text: s['poids'].toString())).toList();
+    List<TextEditingController> repsCtrls = editSeries.map((s) => TextEditingController(text: s['reps'].toString())).toList();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text("Modifier la séance", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: editSeries.length,
+              itemBuilder: (ctx, i) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      Text("S${i+1}", style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: poidsCtrls[i],
+                          style: const TextStyle(color: Colors.white),
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: "Poids", 
+                            labelStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+                            enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white24), borderRadius: BorderRadius.circular(10)),
+                            focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.blueAccent), borderRadius: BorderRadius.circular(10)),
+                            isDense: true,
+                          )
+                        )
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: repsCtrls[i],
+                          style: const TextStyle(color: Colors.white),
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: "Reps", 
+                            labelStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+                            enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white24), borderRadius: BorderRadius.circular(10)),
+                            focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.blueAccent), borderRadius: BorderRadius.circular(10)),
+                            isDense: true,
+                          )
+                        )
+                      ),
+                    ]
+                  ),
+                );
+              }
+            )
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Annuler", style: TextStyle(color: Colors.grey))),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              onPressed: () async {
+                // Sauvegarde des modifications
+                for (int i = 0; i < editSeries.length; i++) {
+                  editSeries[i]['poids'] = poidsCtrls[i].text;
+                  editSeries[i]['reps'] = repsCtrls[i].text;
+                }
+                
+                int realIndex = DatabaseHelper.instance.sessionsSauvegardees.indexOf(session);
+                if (realIndex != -1) {
+                  var modifiedSession = Map<String, dynamic>.from(DatabaseHelper.instance.sessionsSauvegardees[realIndex]);
+                  modifiedSession['series'] = editSeries;
+                  
+                  // On remplace l'ancienne sauvegarde par la nouvelle
+                  await DatabaseHelper.instance.supprimerSeance(realIndex);
+                  await DatabaseHelper.instance.ajouterSeance(modifiedSession);
+                }
+                
+                _chargerHistorique();
+                Navigator.pop(context);
+              },
+              child: const Text("Enregistrer")
+            )
+          ]
+        );
+      }
+    );
   }
 
   void _afficherGraphique(String nomExercice) {
@@ -198,7 +294,55 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
                                         ),
                                       );
                                     }).toList(),
+                                    
                                     const SizedBox(height: 12),
+                                    
+                                    // BOUTONS DE MODIFICATION ET SUPPRESSION
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        TextButton.icon(
+                                          style: TextButton.styleFrom(foregroundColor: Colors.orangeAccent),
+                                          icon: const Icon(Icons.edit, size: 18),
+                                          label: const Text("Modifier"),
+                                          onPressed: () => _editerSession(session),
+                                        ),
+                                        TextButton.icon(
+                                          style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+                                          icon: const Icon(Icons.delete, size: 18),
+                                          label: const Text("Supprimer"),
+                                          onPressed: () async {
+                                            bool confirm = await showDialog(
+                                              context: context,
+                                              builder: (ctx) => AlertDialog(
+                                                backgroundColor: const Color(0xFF1E293B),
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                                title: const Text("Supprimer ?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                                content: const Text("Voulez-vous vraiment supprimer cette séance ?", style: TextStyle(color: Colors.grey)),
+                                                actions: [
+                                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Annuler", style: TextStyle(color: Colors.grey))),
+                                                  ElevatedButton(
+                                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                                                    onPressed: () => Navigator.pop(ctx, true), 
+                                                    child: const Text("Supprimer")
+                                                  ),
+                                                ]
+                                              )
+                                            ) ?? false;
+                                            
+                                            if (confirm) {
+                                              int realIndex = DatabaseHelper.instance.sessionsSauvegardees.indexOf(session);
+                                              if (realIndex != -1) {
+                                                await DatabaseHelper.instance.supprimerSeance(realIndex);
+                                                _chargerHistorique();
+                                              }
+                                            }
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                    
+                                    const SizedBox(height: 8),
                                     OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
                                         side: BorderSide(color: Colors.blueAccent.withOpacity(0.5)),
@@ -250,27 +394,4 @@ class LineChartPainter extends CustomPainter {
 
     Path path = Path();
     for (int i = 0; i < data.length; i++) {
-      double x = data.length > 1 ? i * xStep : xStep;
-      double y = size.height - ((data[i] - minVal) / range) * size.height;
-      if (i == 0) path.moveTo(x, y);
-      else path.lineTo(x, y);
-    }
-    
-    canvas.drawPath(path, paintLine);
-
-    for (int i = 0; i < data.length; i++) {
-      double x = data.length > 1 ? i * xStep : xStep;
-      double y = size.height - ((data[i] - minVal) / range) * size.height;
-      canvas.drawCircle(Offset(x, y), 6, paintPoint);
-      canvas.drawCircle(Offset(x, y), 3, Paint()..color = Colors.white);
-      
-      TextSpan span = TextSpan(style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), text: "${data[i].toInt()}");
-      TextPainter tp = TextPainter(text: span, textAlign: TextAlign.center, textDirection: TextDirection.ltr);
-      tp.layout();
-      tp.paint(canvas, Offset(x - (tp.width / 2), y - 20));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
+      double x = data.length > 1 ? i * xStep : xSte
