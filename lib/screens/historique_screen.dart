@@ -20,21 +20,18 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
   }
 
   void _chargerHistorique() {
-    // Regroupement par Date + Exercice pour écraser les sauvegardes partielles
     Map<String, Map<String, dynamic>> dedup = {};
     for (var session in DatabaseHelper.instance.sessionsSauvegardees) {
       String key = "${session['date']}_${session['exercice']}";
-      dedup[key] = session; // La dernière sauvegarde écrase les précédentes de la même journée
+      dedup[key] = session; 
     }
 
     _historiquePropre = dedup.values.toList();
-    // Tri du plus récent au plus ancien
     _historiquePropre.sort((a, b) => (b['date'] ?? '').compareTo(a['date'] ?? ''));
     setState(() {});
   }
 
   void _editerSession(Map<String, dynamic> session) {
-    // Création d'une copie des séries pour l'édition
     List<Map<String, dynamic>> editSeries = List.generate(
       (session['series'] as List).length,
       (index) => Map<String, dynamic>.from(session['series'][index])
@@ -102,7 +99,6 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
               onPressed: () async {
-                // Sauvegarde des modifications
                 for (int i = 0; i < editSeries.length; i++) {
                   editSeries[i]['poids'] = poidsCtrls[i].text;
                   editSeries[i]['reps'] = repsCtrls[i].text;
@@ -112,8 +108,6 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
                 if (realIndex != -1) {
                   var modifiedSession = Map<String, dynamic>.from(DatabaseHelper.instance.sessionsSauvegardees[realIndex]);
                   modifiedSession['series'] = editSeries;
-                  
-                  // On remplace l'ancienne sauvegarde par la nouvelle
                   await DatabaseHelper.instance.supprimerSeance(realIndex);
                   await DatabaseHelper.instance.ajouterSeance(modifiedSession);
                 }
@@ -138,7 +132,7 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
     }
     
     List<Map<String, dynamic>> sessionsExo = dedup.values.toList();
-    sessionsExo.sort((a, b) => (a['date'] ?? '').compareTo(b['date'] ?? '')); // Chronologique
+    sessionsExo.sort((a, b) => (a['date'] ?? '').compareTo(b['date'] ?? '')); 
 
     List<double> maxWeights = [];
     List<String> dates = [];
@@ -150,7 +144,7 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
         if (w > maxW) maxW = w;
       }
       maxWeights.add(maxW);
-      dates.add(s['date'].toString().substring(5)); // Format MM-DD
+      dates.add(s['date'].toString().substring(5)); 
     }
 
     showModalBottomSheet(
@@ -197,9 +191,7 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
         ),
       ),
     );
-  }
-
-  @override
+    @override
   Widget build(BuildContext context) {
     List<Map<String, dynamic>> historiqueFiltre = _historiquePropre
         .where((s) => (s['exercice'] ?? '').toString().toLowerCase().contains(_recherche.toLowerCase()))
@@ -213,7 +205,6 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
       ),
       body: Column(
         children: [
-          // Barre de recherche
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Container(
@@ -297,7 +288,6 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
                                     
                                     const SizedBox(height: 12),
                                     
-                                    // BOUTONS DE MODIFICATION ET SUPPRESSION
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                       children: [
@@ -369,7 +359,6 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
   }
 }
 
-// Peintre personnalisé pour dessiner le graphique d'évolution
 class LineChartPainter extends CustomPainter {
   final List<double> data;
   LineChartPainter(this.data);
@@ -394,4 +383,29 @@ class LineChartPainter extends CustomPainter {
 
     Path path = Path();
     for (int i = 0; i < data.length; i++) {
-      double x = data.length > 1 ? i * xStep : xSte
+      double x = data.length > 1 ? i * xStep : xStep;
+      double y = size.height - ((data[i] - minVal) / range) * size.height;
+      if (i == 0) path.moveTo(x, y);
+      else path.lineTo(x, y);
+    }
+    
+    canvas.drawPath(path, paintLine);
+
+    for (int i = 0; i < data.length; i++) {
+      double x = data.length > 1 ? i * xStep : xStep;
+      double y = size.height - ((data[i] - minVal) / range) * size.height;
+      canvas.drawCircle(Offset(x, y), 6, paintPoint);
+      canvas.drawCircle(Offset(x, y), 3, Paint()..color = Colors.white);
+      
+      TextSpan span = TextSpan(style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), text: "${data[i].toInt()}");
+      TextPainter tp = TextPainter(text: span, textAlign: TextAlign.center, textDirection: TextDirection.ltr);
+      tp.layout();
+      tp.paint(canvas, Offset(x - (tp.width / 2), y - 20));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+  
+  
