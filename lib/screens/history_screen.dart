@@ -11,6 +11,7 @@ class HistoriqueScreen extends StatefulWidget {
 
 class _HistoriqueScreenState extends State<HistoriqueScreen> {
   List<Map<String, dynamic>> _historiquePropre = [];
+  String _recherche = "";
 
   @override
   void initState() {
@@ -23,7 +24,7 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
     Map<String, Map<String, dynamic>> dedup = {};
     for (var session in DatabaseHelper.instance.sessionsSauvegardees) {
       String key = "${session['date']}_${session['exercice']}";
-      dedup[key] = session; // La dernière sauvegarde écrase les précédentes de la même journée
+      dedup[key] = session; // La dernière sauvegarde de la journée écrase les précédentes
     }
 
     _historiquePropre = dedup.values.toList();
@@ -33,7 +34,6 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
   }
 
   void _afficherGraphique(String nomExercice) {
-    // Récupérer toutes les sessions uniques de cet exercice
     Map<String, Map<String, dynamic>> dedup = {};
     for (var s in DatabaseHelper.instance.sessionsSauvegardees) {
       if (s['exercice'] == nomExercice) {
@@ -105,95 +105,127 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
 
   @override
   Widget build(BuildContext context) {
+    List<Map<String, dynamic>> historiqueFiltre = _historiquePropre
+        .where((s) => (s['exercice'] ?? '').toString().toLowerCase().contains(_recherche.toLowerCase()))
+        .toList();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Historique", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Historique des Séances", style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: _historiquePropre.isEmpty
-          ? const Center(child: Text("Aucune séance enregistrée.", style: TextStyle(color: Colors.grey)))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _historiquePropre.length,
-              itemBuilder: (context, index) {
-                final session = _historiquePropre[index];
-                List series = session['series'] ?? [];
+      body: Column(
+        children: [
+          // Barre de recherche
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: TextField(
+                onChanged: (val) => setState(() => _recherche = val),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: "Rechercher dans l'historique...",
+                  hintStyle: TextStyle(color: Colors.grey),
+                  prefixIcon: Icon(Icons.search, color: Colors.blueAccent),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ),
+          
+          Expanded(
+            child: historiqueFiltre.isEmpty
+                ? const Center(child: Text("Aucune séance trouvée.", style: TextStyle(color: Colors.grey)))
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: historiqueFiltre.length,
+                    itemBuilder: (context, index) {
+                      final session = historiqueFiltre[index];
+                      List series = session['series'] ?? [];
 
-                return Card(
-                  color: Colors.white.withOpacity(0.05),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      iconColor: Colors.blueAccent,
-                      collapsedIconColor: Colors.grey,
-                      title: Text(session['exercice'] ?? 'Exercice', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                      subtitle: Text("Date : ${session['date']} • ${series.length} séries", style: const TextStyle(color: Colors.tealAccent, fontSize: 13)),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                      return Card(
+                        color: Colors.white.withOpacity(0.05),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Theme(
+                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                            iconColor: Colors.blueAccent,
+                            collapsedIconColor: Colors.grey,
+                            title: Text(session['exercice'] ?? 'Exercice', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                            subtitle: Text("Date : ${session['date']} • ${series.length} séries", style: const TextStyle(color: Colors.tealAccent, fontSize: 13)),
                             children: [
-                              ...series.asMap().entries.map((entry) {
-                                int i = entry.key;
-                                var s = entry.value;
-                                bool echec = s['echec'] == true;
-                                bool unilateral = s['unilateral'] == true;
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    ...series.asMap().entries.map((entry) {
+                                      int i = entry.key;
+                                      var s = entry.value;
+                                      bool echec = s['echec'] == true;
+                                      bool unilateral = s['unilateral'] == true;
 
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-                                  margin: const EdgeInsets.only(bottom: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.03),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Text("S${i + 1}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 13)),
-                                      const SizedBox(width: 12),
-                                      Expanded(child: Text("${s['poids']} kg", style: const TextStyle(color: Colors.white))),
-                                      Expanded(child: Text("${s['reps']} reps", style: const TextStyle(color: Colors.white))),
-                                      if (unilateral)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(color: Colors.teal.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
-                                          child: const Text("Uni", style: TextStyle(color: Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                                        margin: const EdgeInsets.only(bottom: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.03),
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
-                                      const SizedBox(width: 6),
-                                      if (echec)
-                                        const Icon(Icons.flag, color: Colors.redAccent, size: 16),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                              const SizedBox(height: 12),
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: Colors.blueAccent.withOpacity(0.5)),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        child: Row(
+                                          children: [
+                                            Text("S${i + 1}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent, fontSize: 13)),
+                                            const SizedBox(width: 12),
+                                            Expanded(child: Text("${s['poids']} kg", style: const TextStyle(color: Colors.white))),
+                                            Expanded(child: Text("${s['reps']} reps", style: const TextStyle(color: Colors.white))),
+                                            if (unilateral)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(color: Colors.teal.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
+                                                child: const Text("Uni", style: TextStyle(color: Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ),
+                                            const SizedBox(width: 6),
+                                            if (echec)
+                                              const Icon(Icons.flag, color: Colors.redAccent, size: 16),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                    const SizedBox(height: 12),
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(color: Colors.blueAccent.withOpacity(0.5)),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      onPressed: () => _afficherGraphique(session['exercice']),
+                                      icon: const Icon(Icons.show_chart, color: Colors.blueAccent),
+                                      label: const Text("Voir l'évolution", style: TextStyle(color: Colors.blueAccent)),
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
                                 ),
-                                onPressed: () => _afficherGraphique(session['exercice']),
-                                icon: const Icon(Icons.show_chart, color: Colors.blueAccent),
-                                label: const Text("Voir l'évolution", style: TextStyle(color: Colors.blueAccent)),
-                              ),
-                              const SizedBox(height: 8),
+                              )
                             ],
                           ),
-                        )
-                      ],
-                    ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// Peintre personnalisé pour dessiner le graphique sans aucun plugin externe
+// Peintre personnalisé pour dessiner le graphique d'évolution
 class LineChartPainter extends CustomPainter {
   final List<double> data;
   LineChartPainter(this.data);
@@ -232,7 +264,6 @@ class LineChartPainter extends CustomPainter {
       canvas.drawCircle(Offset(x, y), 6, paintPoint);
       canvas.drawCircle(Offset(x, y), 3, Paint()..color = Colors.white);
       
-      // Texte du poids au-dessus du point
       TextSpan span = TextSpan(style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), text: "${data[i].toInt()}");
       TextPainter tp = TextPainter(text: span, textAlign: TextAlign.center, textDirection: TextDirection.ltr);
       tp.layout();
