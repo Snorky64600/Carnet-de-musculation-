@@ -89,8 +89,9 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     try {
       final health = Health();
       health.configure();
+
+      // Vérifie que Santé Connect est disponible pour éviter le repli sur Google Fit
       var status = await health.getHealthConnectSdkStatus();
-      
       if (status == HealthConnectSdkStatus.sdkAvailable) {
         bool authorized = await health.requestAuthorization(
           [HealthDataType.WORKOUT],
@@ -353,5 +354,3 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     );
   }
 }
-
-  
