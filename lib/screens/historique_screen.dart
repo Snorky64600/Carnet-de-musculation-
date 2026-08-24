@@ -191,7 +191,9 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
         ),
       ),
     );
-    @override
+  }
+
+  @override
   Widget build(BuildContext context) {
     List<Map<String, dynamic>> historiqueFiltre = _historiquePropre
         .where((s) => (s['exercice'] ?? '').toString().toLowerCase().contains(_recherche.toLowerCase()))
@@ -358,7 +360,6 @@ class _HistoriqueScreenState extends State<HistoriqueScreen> {
     );
   }
 }
-
 class LineChartPainter extends CustomPainter {
   final List<double> data;
   LineChartPainter(this.data);
@@ -407,5 +408,3 @@ class LineChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
-  
-  
