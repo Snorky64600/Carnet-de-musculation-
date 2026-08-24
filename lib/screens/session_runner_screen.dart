@@ -214,7 +214,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                   ),
                 ),
 
-                Expanded(
+                                Expanded(
                   child: ListView.builder(
                     itemCount: _seriesList.length,
                     itemBuilder: (context, i) => Card(
@@ -226,11 +226,28 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                         child: Row(children: [
                           Text("S${i + 1}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
                           const SizedBox(width: 8),
-                          Expanded(child: TextField(controller: _seriesList[i]['poids'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Poids (kg)', isDense: true))),
-                          const SizedBox(width: 8),
+                          Expanded(child: TextField(controller: _seriesList[i]['poids'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Poids', isDense: true))),
+                          const SizedBox(width: 4),
                           Expanded(child: TextField(controller: _seriesList[i]['reps'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Reps', isDense: true))),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 4),
                           Expanded(child: TextField(controller: _seriesList[i]['rpe'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'RPE', isDense: true))),
+                          const SizedBox(width: 4),
+                          
+                          // Bouton Unilatéral (Uni)
+                          GestureDetector(
+                            onTap: () => setState(() => _seriesList[i]['unilateral'] = !(_seriesList[i]['unilateral'] ?? false)),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: (_seriesList[i]['unilateral'] == true) ? Colors.blueAccent : Colors.transparent,
+                                border: Border.all(color: Colors.blueAccent),
+                                borderRadius: BorderRadius.circular(8)
+                              ),
+                              child: Text("Uni", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: (_seriesList[i]['unilateral'] == true) ? Colors.white : Colors.blueAccent)),
+                            )
+                          ),
+                          
+                          // Bouton Échec
                           IconButton(
                             icon: Icon(Icons.flag, color: _seriesList[i]['echec'] ? Colors.redAccent : Colors.grey),
                             onPressed: () => setState(() => _seriesList[i]['echec'] = !_seriesList[i]['echec']),
