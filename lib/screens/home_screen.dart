@@ -303,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => const ChronoBottomSheet(),
     );
   }
-    @override
+   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -472,11 +472,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCarteProgrammeEnCours() {
     String today = DateTime.now().toString().split(' ')[0];
     
-    List<Map<String, dynamic>> sessionsAujourdhui = DatabaseHelper.instance.sessionsSauvegardees
-        .where((s) => s['date'] == today)
-        .toList();
+    // Regroupement par exercice pour n'afficher QU'UNE SEULE ligne par exercice du jour
+    Map<String, List<Map<String, dynamic>>> exercicesDuJour = {};
+    for (var s in DatabaseHelper.instance.sessionsSauvegardees) {
+      if (s['date'] == today) {
+        String nomExo = s['exercice'] ?? 'Exercice';
+        exercicesDuJour.putIfAbsent(nomExo, () => []);
+        List series = s['series'] ?? [];
+        exercicesDuJour[nomExo]!.addAll(series.cast<Map<String, dynamic>>());
+      }
+    }
 
-    if (sessionsAujourdhui.isEmpty) {
+    if (exercicesDuJour.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -516,13 +523,13 @@ class _HomeScreenState extends State<HomeScreen> {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            "EXERCICE(S) EN COURS AUJOURD'HUI (${sessionsAujourdhui.length})",
+            "EXERCICE(S) EN COURS AUJOURD'HUI (${exercicesDuJour.length})",
             style: TextStyle(color: Colors.blueAccent.shade100, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
           ),
         ),
-        ...sessionsAujourdhui.map((session) {
-          String nom = session['exercice'] ?? 'Exercice';
-          List seriesList = session['series'] ?? [];
+        ...exercicesDuJour.entries.map((entry) {
+          String nom = entry.key;
+          List seriesList = entry.value;
 
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
@@ -542,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.play_circle_fill, color: Colors.blueAccent, size: 28),
+                  const Icon(Icons.edit, color: Colors.blueAccent, size: 22),
                   const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.grey, size: 20),
