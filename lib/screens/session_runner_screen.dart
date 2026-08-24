@@ -109,7 +109,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     } catch (_) {}
   }
 
-  Future<void> _saveSession() async {
+    Future<void> _saveSession() async {
     List<Map<String, dynamic>> formatted = _seriesList.map((s) => {
       'poids': s['poids'].text,
       'reps': s['reps'].text,
@@ -124,8 +124,16 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       'series': formatted,
     });
 
+    // Enregistre l'exercice dans "programme_en_cours" pour qu'il apparaisse sur l'accueil
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('programme_en_cours', jsonEncode({
+      'nom': widget.exercices[_currentIndex].nom,
+      'series': formatted,
+    }));
+
     _exportToHealthConnect(widget.exercices[_currentIndex].nom);
   }
+
     @override
   Widget build(BuildContext context) {
     final exo = widget.exercices[_currentIndex];
