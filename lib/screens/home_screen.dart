@@ -40,15 +40,8 @@ class _HomeScreenState extends State<HomeScreen> {
     Map<String, dynamic>? progEnCours;
     if (progEnCoursStr != null) {
       progEnCours = jsonDecode(progEnCoursStr);
-    } else {
-      final String? progStr = prefs.getString('mes_programmes');
-      if (progStr != null) {
-        List progs = jsonDecode(progStr);
-        if (progs.isNotEmpty) {
-          progEnCours = progs.first;
-        }
-      }
     }
+    // Suppression du fallback automatique : n'affiche rien tant qu'on n'a pas cliqué sur Enregistrer
 
     if (mounted) {
       setState(() {
@@ -288,7 +281,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       trailing: const Icon(Icons.play_arrow, color: Colors.blueAccent),
                       onTap: () async {
                         Navigator.pop(context);
-                        await prefs.setString('programme_en_cours', jsonEncode(prog));
                         List<ExerciseModel> exos = exosList.map((e) => ExerciseModel.fromJson(e)).toList();
                         Navigator.push(
                           context,
@@ -314,7 +306,6 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => const ChronoBottomSheet(),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -507,20 +498,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text("Séance en cours", style: TextStyle(color: Colors.grey, fontSize: 13)),
                   SizedBox(height: 2),
-                  Text("Aucun programme sélectionné", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+                  Text("Aucune séance enregistrée", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
                 ],
               ),
             ),
-            TextButton(
-              onPressed: _ouvrirSelectionProgramme,
-              child: const Text("Choisir", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
-            )
           ],
         ),
       );
     }
 
-    List exosList = _programmeEnCours!['exercices'] ?? [];
+    String nom = _programmeEnCours!['nom'] ?? 'Séance';
+    List seriesList = _programmeEnCours!['series'] ?? [];
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -544,46 +532,39 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Icon(Icons.play_circle_fill, color: Colors.blueAccent, size: 22),
                   const SizedBox(width: 8),
                   Text(
-                    "PROGRAMME EN COURS",
-                    style: TextStyle(color: Colors.blueAccent.shade100, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                    "DERNIER EXERCICE ENREGISTRÉ",
+                    style: TextStyle(color: Colors.blueAccent.shade100, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                child: Text(
-                  "${exosList.length} exos",
-                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-              )
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.grey, size: 20),
+                tooltip: "Supprimer / Ne pas garder",
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.remove('programme_en_cours');
+                  
+                  // Supprime également de l'historique de la base de données locale si on ne souhaite pas le garder
+                  String today = DateTime.now().toString().split(' ')[0];
+                  DatabaseHelper.instance.sessionsSauvegardees.removeWhere((s) => s['date'] == today && s['exercice'] == nom);
+                  
+                  _chargerDonneesCalendrierEtProgramme();
+                },
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
-            _programmeEnCours!['nom'] ?? 'Programme',
+            nom,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
           ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () {
-                List<ExerciseModel> exos = exosList.map((e) => ExerciseModel.fromJson(e)).toList();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => SessionRunnerScreen(exercices: exos, isProgramme: true)),
-                ).then((_) => _chargerDonneesCalendrierEtProgramme());
-              },
-              icon: const Icon(Icons.play_arrow, size: 20),
-              label: const Text("Continuer la séance", style: TextStyle(fontWeight: FontWeight.bold)),
+          if (seriesList.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              "${seriesList.length} série(s) enregistrée(s)",
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
-          ),
+          ],
         ],
       ),
     );
