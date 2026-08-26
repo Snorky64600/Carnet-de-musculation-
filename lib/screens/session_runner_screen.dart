@@ -146,6 +146,99 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
+  Widget _buildFormattedText(String text) {
+    List<TextSpan> spans = [];
+    RegExp exp = RegExp(r'\*\*(.*?)\*\*');
+    int lastIndex = 0;
+
+    for (Match match in exp.allMatches(text)) {
+      if (match.start > lastIndex) {
+        spans.add(TextSpan(
+          text: text.substring(lastIndex, match.start),
+          style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.4),
+        ));
+      }
+      spans.add(TextSpan(
+        text: match.group(1),
+        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15, height: 1.4),
+      ));
+      lastIndex = match.end;
+    }
+
+    if (lastIndex < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastIndex),
+        style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.4),
+      ));
+    }
+
+    return RichText(text: TextSpan(children: spans));
+  }
+
+  void _ouvrirGaleriePhotos(BuildContext context, List<String> images, int initialIndex) {
+    if (images.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        int pageIndex = initialIndex;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Dialog(
+              backgroundColor: Colors.black,
+              insetPadding: EdgeInsets.zero,
+              child: Stack(
+                children: [
+                  PageView.builder(
+                    itemCount: images.length,
+                    controller: PageController(initialPage: initialIndex),
+                    onPageChanged: (idx) => setModalState(() => pageIndex = idx),
+                    itemBuilder: (context, index) {
+                      return InteractiveViewer(
+                        minScale: 0.8,
+                        maxScale: 4.0,
+                        child: Center(
+                          child: buildMediaWidget(images[index], fit: BoxFit.contain),
+                        ),
+                      );
+                    },
+                  ),
+                  Positioned(
+                    top: 40,
+                    right: 20,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  if (images.length > 1)
+                    Positioned(
+                      bottom: 30,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            "${pageIndex + 1} / ${images.length}",
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _exportToHealthConnect(String title) async {
     try {
       final health = Health();
@@ -383,7 +476,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       ),
     );
   }
-    @override
+   @override
   Widget build(BuildContext context) {
     final exo = widget.exercices[_currentIndex];
 
@@ -395,24 +488,36 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       body: PageView(
         controller: _pageController,
         children: [
-          // PAGE 1 : Visuel & Consignes
+          // PAGE 1 : Visuel Carrousel & Consignes Défilables
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                Container(
-                  height: 240,
-                  width: double.infinity,
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(20)),
-                  child: exo.images.isNotEmpty ? buildMediaWidget(exo.images.first, fit: BoxFit.cover) : const Center(child: Icon(Icons.fitness_center, size: 80)),
+                ImageCarouselWidget(
+                  images: exo.images,
+                  onTapImage: (index) => _ouvrirGaleriePhotos(context, exo.images, index),
                 ),
-                const SizedBox(height: 20),
-                Text(exo.steps.isNotEmpty ? exo.steps.join('\n\n') : "Aucune consigne.", style: const TextStyle(fontSize: 15, height: 1.3)),
-                const Spacer(),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: _buildFormattedText(
+                        exo.steps.isNotEmpty ? exo.steps.join('\n\n') : "Aucune consigne."
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, minimumSize: const Size(double.infinity, 50)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
                   onPressed: () => _pageController.jumpToPage(1),
-                  child: const Text("Passer aux séries"),
+                  child: const Text("Passer aux séries", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
               ],
             ),
@@ -733,6 +838,100 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       selectedColor: Colors.tealAccent,
       backgroundColor: Colors.white.withOpacity(0.08),
       onSelected: (_) => setState(() => _selectedRestSeconds = seconds),
+    );
+  }
+}
+
+class ImageCarouselWidget extends StatefulWidget {
+  final List<String> images;
+  final Function(int) onTapImage;
+
+  const ImageCarouselWidget({Key? key, required this.images, required this.onTapImage}) : super(key: key);
+
+  @override
+  State<ImageCarouselWidget> createState() => _ImageCarouselWidgetState();
+}
+
+class _ImageCarouselWidgetState extends State<ImageCarouselWidget> {
+  int _currentImageIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.images.isEmpty) {
+      return Container(
+        height: 220,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Center(child: Icon(Icons.fitness_center, size: 80, color: Colors.grey)),
+      );
+    }
+
+    return Container(
+      height: 220,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            PageView.builder(
+              itemCount: widget.images.length,
+              onPageChanged: (idx) => setState(() => _currentImageIndex = idx),
+              itemBuilder: (context, index) {
+                return GestureDetector(
+                  onTap: () => widget.onTapImage(index),
+                  child: Center(
+                    child: buildMediaWidget(widget.images[index], fit: BoxFit.contain),
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: () => widget.onTapImage(_currentImageIndex),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.fullscreen, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+            if (widget.images.length > 1)
+              Positioned(
+                bottom: 10,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    widget.images.length,
+                    (i) => Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: _currentImageIndex == i ? 16 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _currentImageIndex == i ? Colors.blueAccent : Colors.white38,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
