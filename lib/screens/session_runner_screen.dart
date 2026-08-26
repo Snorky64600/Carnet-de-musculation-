@@ -127,7 +127,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
     } catch (_) {}
   }
 
-  Future<void> _saveSession() async {
+  Future<void> _saveSession({bool estTermine = false}) async {
     List<Map<String, dynamic>> formatted = _seriesList.map((s) => {
       'poids': s['poids'].text,
       'reps': s['reps'].text,
@@ -147,15 +147,36 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       'date': today,
       'exercice': currentExoNom,
       'series': formatted,
+      'estTermine': estTermine,
     });
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('programme_en_cours', jsonEncode({
-      'nom': currentExoNom,
-      'series': formatted,
-    }));
+    if (estTermine) {
+      await prefs.remove('programme_en_cours');
+    } else {
+      await prefs.setString('programme_en_cours', jsonEncode({
+        'nom': currentExoNom,
+        'series': formatted,
+      }));
+    }
 
     _exportToHealthConnect(currentExoNom);
+  }
+
+  Future<void> _terminerTouteLaSeance() async {
+    String today = DateTime.now().toString().split(' ')[0];
+    await _saveSession(estTermine: true);
+
+    for (var exo in widget.exercices) {
+      for (var session in DatabaseHelper.instance.sessionsSauvegardees) {
+        if (session['date'] == today && session['exercice'] == exo.nom) {
+          session['estTermine'] = true;
+        }
+      }
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('programme_en_cours');
   }
 
   void _editerSession(Map<String, dynamic> session) {
@@ -320,7 +341,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       ),
     );
   }
-    @override
+  @override
   Widget build(BuildContext context) {
     final exo = widget.exercices[_currentIndex];
 
@@ -434,7 +455,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                           Expanded(child: TextField(controller: _seriesList[i]['rpe'], keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'RPE', isDense: true))),
                           const SizedBox(width: 4),
                           
-                          // Bouton Unilatéral
                           GestureDetector(
                             onTap: () => setState(() => _seriesList[i]['unilateral'] = !(_seriesList[i]['unilateral'] ?? false)),
                             child: Container(
@@ -448,7 +468,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                             )
                           ),
                           
-                          // Bouton Échec
                           IconButton(
                             icon: Icon(Icons.flag, color: _seriesList[i]['echec'] ? Colors.redAccent : Colors.grey),
                             onPressed: () => setState(() => _seriesList[i]['echec'] = !_seriesList[i]['echec']),
@@ -468,7 +487,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
-                        await _saveSession();
+                        await _saveSession(estTermine: false);
                         setState(() {});
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Séance enregistrée !")));
                       },
@@ -480,18 +499,19 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF0055)),
                       onPressed: () async {
-                        await _saveSession();
                         if (_currentIndex < widget.exercices.length - 1) {
+                          await _saveSession(estTermine: true);
                           setState(() {
                             _currentIndex++;
                             _chargerOuReinitialiserSeries();
                           });
                           _pageController.jumpToPage(0);
                         } else {
+                          await _terminerTouteLaSeance();
                           Navigator.pop(context);
                         }
                       },
-                      child: const Text("Terminer la séance"),
+                      child: Text(_currentIndex < widget.exercices.length - 1 ? "Exercice suivant" : "Terminer la séance"),
                     ),
                   ),
                 ]),
@@ -499,7 +519,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
             ),
           ),
 
-          // PAGE 3 : Historique structuré à l'identique du menu Historique
+          // PAGE 3 : Historique structuré
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -715,4 +735,4 @@ class LineChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
+}  
