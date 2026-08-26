@@ -303,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => const ChronoBottomSheet(),
     );
   }
-   @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -472,10 +472,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCarteProgrammeEnCours() {
     String today = DateTime.now().toString().split(' ')[0];
     
-    // Regroupement par exercice pour n'afficher QU'UNE SEULE ligne par exercice du jour
+    // N'affiche que les exercices sauvegardés qui n'ont PAS encore été marqués comme terminés (estTermine != true)
     Map<String, List<Map<String, dynamic>>> exercicesDuJour = {};
     for (var s in DatabaseHelper.instance.sessionsSauvegardees) {
-      if (s['date'] == today) {
+      if (s['date'] == today && s['estTermine'] != true) {
         String nomExo = s['exercice'] ?? 'Exercice';
         exercicesDuJour.putIfAbsent(nomExo, () => []);
         List series = s['series'] ?? [];
