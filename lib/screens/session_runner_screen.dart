@@ -21,7 +21,7 @@ class SessionRunnerScreen extends StatefulWidget {
 
 class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   int _currentIndex = 0;
-  final PageController _pageController = PageController();
+  late PageController _pageController;
   final DateTime _sessionStartTime = DateTime.now();
 
   List<Map<String, dynamic>> _seriesList = [];
@@ -34,12 +34,23 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   @override
   void initState() {
     super.initState();
+    String today = DateTime.now().toString().split(' ')[0];
+    String currentExoNom = widget.exercices[_currentIndex].nom;
+    var existingList = DatabaseHelper.instance.sessionsSauvegardees.where(
+      (s) => s['date'] == today && s['exercice'] == currentExoNom
+    ).toList();
+    
+    // Ouvre directement sur la page des séries (index 1) si l'exercice a déjà des données aujourd'hui
+    bool hasExisting = existingList.isNotEmpty;
+    _pageController = PageController(initialPage: hasExisting ? 1 : 0);
+    
     _chargerOuReinitialiserSeries();
   }
 
   @override
   void dispose() {
     _restTimer?.cancel();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -341,7 +352,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       ),
     );
   }
-  @override
+    @override
   Widget build(BuildContext context) {
     final exo = widget.exercices[_currentIndex];
 
@@ -505,7 +516,12 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                             _currentIndex++;
                             _chargerOuReinitialiserSeries();
                           });
-                          _pageController.jumpToPage(0);
+                          String today = DateTime.now().toString().split(' ')[0];
+                          String nextExoNom = widget.exercices[_currentIndex].nom;
+                          var nextExisting = DatabaseHelper.instance.sessionsSauvegardees.where(
+                            (s) => s['date'] == today && s['exercice'] == nextExoNom
+                          ).toList();
+                          _pageController.jumpToPage(nextExisting.isNotEmpty ? 1 : 0);
                         } else {
                           await _terminerTouteLaSeance();
                           Navigator.pop(context);
@@ -735,4 +751,4 @@ class LineChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}  
+}
