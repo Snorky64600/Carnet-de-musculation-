@@ -27,7 +27,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
     }
   }
 
-  Future<void> _saveExercice() async {
+  void _saveExercice() {
     if (_nomController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Veuillez saisir un nom d'exercice.")),
@@ -53,7 +53,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
       steps: steps,
     );
 
-    await DatabaseHelper.instance.ajouterExerciceCustom(newExo);
+    DatabaseHelper.instance.exercicesDisponibles.add(newExo);
 
     if (mounted) {
       _nomController.clear();
