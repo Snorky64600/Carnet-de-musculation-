@@ -22,6 +22,7 @@ class SessionRunnerScreen extends StatefulWidget {
 class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   int _currentIndex = 0;
   late PageController _pageController;
+  final ScrollController _seriesScrollController = ScrollController();
   final DateTime _sessionStartTime = DateTime.now();
 
   List<Map<String, dynamic>> _seriesList = [];
@@ -40,7 +41,6 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
       (s) => s['date'] == today && s['exercice'] == currentExoNom
     ).toList();
     
-    // Ouvre directement sur la page des séries (index 1) si l'exercice a déjà des données aujourd'hui
     bool hasExisting = existingList.isNotEmpty;
     _pageController = PageController(initialPage: hasExisting ? 1 : 0);
     
@@ -51,6 +51,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
   void dispose() {
     _restTimer?.cancel();
     _pageController.dispose();
+    _seriesScrollController.dispose();
     super.dispose();
   }
 
@@ -64,18 +65,48 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
 
     if (existingList.isNotEmpty && existingList.last['series'] != null) {
       List seriesData = existingList.last['series'];
-      _seriesList = seriesData.map((s) => {
-        'poids': TextEditingController(text: s['poids']?.toString() ?? ''),
-        'reps': TextEditingController(text: s['reps']?.toString() ?? ''),
-        'rpe': TextEditingController(text: s['rpe']?.toString() ?? ''),
-        'echec': s['echec'] == true,
-        'unilateral': s['unilateral'] == true,
-      }).toList();
+      _seriesList = List<Map<String, dynamic>>.from(
+        seriesData.map((s) => {
+          'poids': TextEditingController(text: s['poids']?.toString() ?? ''),
+          'reps': TextEditingController(text: s['reps']?.toString() ?? ''),
+          'rpe': TextEditingController(text: s['rpe']?.toString() ?? ''),
+          'echec': s['echec'] == true,
+          'unilateral': s['unilateral'] == true,
+        })
+      );
     } else {
       _seriesList = [
-        {'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false, 'unilateral': false}
+        {
+          'poids': TextEditingController(),
+          'reps': TextEditingController(),
+          'rpe': TextEditingController(),
+          'echec': false,
+          'unilateral': false,
+        }
       ];
     }
+  }
+
+  void _ajouterSerie() {
+    setState(() {
+      _seriesList.add({
+        'poids': TextEditingController(),
+        'reps': TextEditingController(),
+        'rpe': TextEditingController(),
+        'echec': false,
+        'unilateral': false,
+      });
+    });
+
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_seriesScrollController.hasClients) {
+        _seriesScrollController.animateTo(
+          _seriesScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   void _lancerRepos(int seconds) {
@@ -449,8 +480,10 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
 
                 Expanded(
                   child: ListView.builder(
+                    controller: _seriesScrollController,
                     itemCount: _seriesList.length,
                     itemBuilder: (context, i) => Card(
+                      key: ValueKey("serie_card_${i}_${_seriesList.length}"),
                       color: Colors.white.withOpacity(0.05),
                       margin: const EdgeInsets.only(bottom: 10),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -489,7 +522,7 @@ class _SessionRunnerScreenState extends State<SessionRunnerScreen> {
                   ),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => setState(() => _seriesList.add({'poids': TextEditingController(), 'reps': TextEditingController(), 'rpe': TextEditingController(), 'echec': false, 'unilateral': false})),
+                  onPressed: _ajouterSerie,
                   icon: const Icon(Icons.add),
                   label: const Text("Ajouter une série"),
                 ),
