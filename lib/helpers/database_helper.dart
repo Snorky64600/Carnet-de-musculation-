@@ -6,14 +6,75 @@ class DatabaseHelper {
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
 
+  // Liste initiale d'exercices de base
+  final List<ExerciseModel> _exercicesParDefaut = [
+    ExerciseModel(
+      nom: "Bench Press",
+      tags: ["Pectoraux", "Triceps"],
+      images: [],
+      steps: ["Allongez-vous sur le banc.", "Poussez la barre vers le haut."],
+    ),
+    ExerciseModel(
+      nom: "Stationary Lunge",
+      tags: ["Jambes", "Fessiers"],
+      images: [],
+      steps: [],
+    ),
+    ExerciseModel(
+      nom: "Goblet Squat",
+      tags: ["Jambes", "Quadriceps"],
+      images: [],
+      steps: [],
+    ),
+    ExerciseModel(
+      nom: "Paused Sumo Squat",
+      tags: ["Jambes", "Adducteurs"],
+      images: [],
+      steps: [],
+    ),
+    ExerciseModel(
+      nom: "Walking Lunge",
+      tags: ["Jambes", "Fessiers"],
+      images: [],
+      steps: [],
+    ),
+    ExerciseModel(
+      nom: "Elevated Glute Bridge",
+      tags: ["Fessiers", "Ischios"],
+      images: [],
+      steps: [],
+    ),
+    ExerciseModel(
+      nom: "Curtsy Lunge",
+      tags: ["Jambes", "Fessiers"],
+      images: [],
+      steps: [],
+    ),
+    ExerciseModel(
+      nom: "Paused Hiptrust",
+      tags: ["Fessiers"],
+      images: [],
+      steps: [],
+    ),
+    ExerciseModel(
+      nom: "Alternating Front Raise",
+      tags: ["Épaules"],
+      images: [],
+      steps: [],
+    ),
+  ];
+
   List<ExerciseModel> exercicesDisponibles = [];
   List<Map<String, dynamic>> sessionsSauvegardees = [];
 
-  /// Charge toutes les données au démarrage de l'application (appelé par main.dart)
+  /// Charge toutes les données au démarrage de l'application
   Future<void> chargerDonnees() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // 1. Chargement des exercices custom
+    // 1. Charger la liste de base
+    exercicesDisponibles = List<ExerciseModel>.from(_exercicesParDefaut);
+
+    // 2. Fusionner avec les exercices custom ou modifiés sauvegardés
     final String? customStr = prefs.getString('exercices_custom');
     if (customStr != null) {
       List decoded = jsonDecode(customStr);
@@ -29,7 +90,7 @@ class DatabaseHelper {
       }
     }
 
-    // 2. Chargement de l'historique des séances
+    // 3. Charger l'historique des séances
     final String? sessionsStr = prefs.getString('sessions_sauvegardees');
     if (sessionsStr != null) {
       List decoded = jsonDecode(sessionsStr);
@@ -37,12 +98,10 @@ class DatabaseHelper {
     }
   }
 
-  /// Alias pour rafraîchir uniquement les exercices
   Future<void> chargerExercicesCustom() async {
     await chargerDonnees();
   }
 
-  /// Sauvegarde la totalité de la liste des exercices dans SharedPreferences
   Future<void> sauvegarderExercicesCustom() async {
     final prefs = await SharedPreferences.getInstance();
     List<Map<String, dynamic>> listJson = exercicesDisponibles.map((e) => e.toJson()).toList();
