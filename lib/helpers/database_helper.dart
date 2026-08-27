@@ -9,9 +9,11 @@ class DatabaseHelper {
   List<ExerciseModel> exercicesDisponibles = [];
   List<Map<String, dynamic>> sessionsSauvegardees = [];
 
-  /// Charge la liste globale des exercices custom sauvegardés sur l'appareil
-  Future<void> chargerExercicesCustom() async {
+  /// Charge toutes les données au démarrage de l'application (appelé par main.dart)
+  Future<void> chargerDonnees() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // 1. Chargement des exercices custom
     final String? customStr = prefs.getString('exercices_custom');
     if (customStr != null) {
       List decoded = jsonDecode(customStr);
@@ -26,6 +28,18 @@ class DatabaseHelper {
         }
       }
     }
+
+    // 2. Chargement de l'historique des séances
+    final String? sessionsStr = prefs.getString('sessions_sauvegardees');
+    if (sessionsStr != null) {
+      List decoded = jsonDecode(sessionsStr);
+      sessionsSauvegardees = List<Map<String, dynamic>>.from(decoded);
+    }
+  }
+
+  /// Alias pour rafraîchir uniquement les exercices
+  Future<void> chargerExercicesCustom() async {
+    await chargerDonnees();
   }
 
   /// Sauvegarde la totalité de la liste des exercices dans SharedPreferences
