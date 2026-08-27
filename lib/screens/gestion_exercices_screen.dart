@@ -14,6 +14,14 @@ class GestionExercicesScreen extends StatefulWidget {
 class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
   String _searchQuery = '';
 
+  @override
+  void initState() {
+    super.initState();
+    DatabaseHelper.instance.chargerExercicesCustom().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
   Widget _buildFormattedText(String text) {
     List<TextSpan> spans = [];
     RegExp exp = RegExp(r'\*\*(.*?)\*\*');
@@ -66,6 +74,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
       setState(() {
         DatabaseHelper.instance.exercicesDisponibles.removeWhere((e) => e.nom == exo.nom);
       });
+      await DatabaseHelper.instance.sauvegarderExercicesCustom();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Exercice supprimé.")));
     }
   }
@@ -78,7 +87,10 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (context) => FormulaireExerciceModal(
         exoAEditer: exoAEditer,
-        onSave: () => setState(() {}),
+        onSave: () async {
+          await DatabaseHelper.instance.sauvegarderExercicesCustom();
+          if (mounted) setState(() {});
+        },
       ),
     );
   }
@@ -238,7 +250,7 @@ class _FormulaireExerciceModalState extends State<FormulaireExerciceModal> {
     }
   }
 
-  void _saveExercice() {
+  void _saveExercice() async {
     if (_nomController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Veuillez saisir un nom d'exercice.")),
