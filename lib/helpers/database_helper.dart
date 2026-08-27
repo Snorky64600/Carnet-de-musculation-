@@ -3,122 +3,136 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/exercise_model.dart';
 
 class DatabaseHelper {
-  DatabaseHelper._privateConstructor();
-  static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
+  DatabaseHelper._init();
+  static final DatabaseHelper instance = DatabaseHelper._init();
 
-  // Liste initiale d'exercices de base
-  final List<ExerciseModel> _exercicesParDefaut = [
+  List<Map<String, dynamic>> sessionsSauvegardees = [];
+  List<ExerciseModel> exercicesDisponibles = [
     ExerciseModel(
-      nom: "Bench Press",
-      tags: ["Pectoraux", "Triceps"],
-      images: [],
-      steps: ["Allongez-vous sur le banc.", "Poussez la barre vers le haut."],
+      nom: 'Développé couché',
+      images: ['https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600'],
+      tags: ['Poitrine', 'Triceps', 'Force'],
+      steps: [
+        'Allongez-vous sur le banc, les yeux sous la barre.',
+        'Décrochez et descendez la barre contrôlée jusqu\'au milieu de la poitrine.',
+        'Développez vers le haut en expirant.'
+      ],
     ),
     ExerciseModel(
-      nom: "Stationary Lunge",
-      tags: ["Jambes", "Fessiers"],
-      images: [],
-      steps: [],
+      nom: 'Tirage poitrine',
+      images: ['https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=600'],
+      tags: ['Dos', 'Biceps', 'Largeur'],
+      steps: [
+        'Asseyez-vous sur la machine, ajustez les boudins et saisissez la barre.',
+        'Tirez la barre vers le haut de votre poitrine en contractant les omoplates.'
+      ],
     ),
     ExerciseModel(
-      nom: "Goblet Squat",
-      tags: ["Jambes", "Quadriceps"],
-      images: [],
-      steps: [],
+      nom: 'Squat bulgare',
+      images: ['https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=600'],
+      tags: ['Jambes', 'Fessiers', 'Équilibre'],
+      steps: [
+        'Placez un pied en arrière sur un support stable.',
+        'Fléchissez la jambe avant pour descendre le bassin verticalement.'
+      ],
     ),
     ExerciseModel(
-      nom: "Paused Sumo Squat",
-      tags: ["Jambes", "Adducteurs"],
-      images: [],
-      steps: [],
+      nom: 'Face curls à la poulie',
+      images: ['https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600'],
+      tags: ['Épaules', 'Arrière d\'épaule', 'Posture'],
+      steps: [
+        'Fixez la corde à hauteur des yeux sur la poulie.',
+        'Tirez la corde vers votre visage en écartant les coudes.'
+      ],
     ),
     ExerciseModel(
-      nom: "Walking Lunge",
-      tags: ["Jambes", "Fessiers"],
-      images: [],
-      steps: [],
-    ),
-    ExerciseModel(
-      nom: "Elevated Glute Bridge",
-      tags: ["Fessiers", "Ischios"],
-      images: [],
-      steps: [],
-    ),
-    ExerciseModel(
-      nom: "Curtsy Lunge",
-      tags: ["Jambes", "Fessiers"],
-      images: [],
-      steps: [],
-    ),
-    ExerciseModel(
-      nom: "Paused Hiptrust",
-      tags: ["Fessiers"],
-      images: [],
-      steps: [],
-    ),
-    ExerciseModel(
-      nom: "Alternating Front Raise",
-      tags: ["Épaules"],
-      images: [],
-      steps: [],
+      nom: 'Gainage',
+      images: ['https://images.unsplash.com/photo-1566241142559-40e1dab266c6?w=600'],
+      tags: ['Sangle abdominale', 'Core', 'Stabilité'],
+      steps: [
+        'Placez-vous en appui sur les avant-bras et sur la pointe des pieds.',
+        'Gardez le corps parfaitement aligné.'
+      ],
     ),
   ];
 
-  List<ExerciseModel> exercicesDisponibles = [];
-  List<Map<String, dynamic>> sessionsSauvegardees = [];
-
-  /// Charge toutes les données au démarrage de l'application
   Future<void> chargerDonnees() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // 1. Charger la liste de base
-    exercicesDisponibles = List<ExerciseModel>.from(_exercicesParDefaut);
-
-    // 2. Fusionner avec les exercices custom ou modifiés sauvegardés
-    final String? customStr = prefs.getString('exercices_custom');
-    if (customStr != null) {
-      List decoded = jsonDecode(customStr);
-      List<ExerciseModel> sauvegardes = decoded.map((e) => ExerciseModel.fromJson(e)).toList();
-      
-      for (var exo in sauvegardes) {
-        int index = exercicesDisponibles.indexWhere((e) => e.nom.toLowerCase() == exo.nom.toLowerCase());
-        if (index != -1) {
-          exercicesDisponibles[index] = exo;
+    // 1. Charger la banque d'exercices enregistrée
+    final String? exosStr = prefs.getString('exercices_disponibles');
+    if (exosStr != null && exosStr.isNotEmpty) {
+      try {
+        List decoded = jsonDecode(exosStr);
+        if (decoded.isNotEmpty && decoded.first is String) {
+          exercicesDisponibles = decoded.map((nom) => ExerciseModel(nom: nom.toString())).toList();
         } else {
-          exercicesDisponibles.add(exo);
+          exercicesDisponibles = decoded.map((e) => ExerciseModel.fromJson(e)).toList();
         }
-      }
+      } catch (_) {}
     }
 
-    // 3. Charger l'historique des séances
-    final String? sessionsStr = prefs.getString('sessions_sauvegardees');
-    if (sessionsStr != null) {
-      List decoded = jsonDecode(sessionsStr);
-      sessionsSauvegardees = List<Map<String, dynamic>>.from(decoded);
+    // 2. Charger l'historique des séances
+    final String? sessStr = prefs.getString('sessions_sauvegardees');
+    if (sessStr != null && sessStr.isNotEmpty) {
+      try {
+        List decoded = jsonDecode(sessStr);
+        sessionsSauvegardees = List<Map<String, dynamic>>.from(
+          decoded.map((e) => Map<String, dynamic>.from(e))
+        );
+      } catch (_) {}
     }
   }
 
-  Future<void> chargerExercicesCustom() async {
-    await chargerDonnees();
-  }
-
-  Future<void> sauvegarderExercicesCustom() async {
+  Future<void> sauvegarder() async {
     final prefs = await SharedPreferences.getInstance();
-    List<Map<String, dynamic>> listJson = exercicesDisponibles.map((e) => e.toJson()).toList();
-    await prefs.setString('exercices_custom', jsonEncode(listJson));
+    await prefs.setString(
+      'exercices_disponibles',
+      jsonEncode(exercicesDisponibles.map((e) => e.toJson()).toList()),
+    );
+    await prefs.setString(
+      'sessions_sauvegardees',
+      jsonEncode(sessionsSauvegardees),
+    );
   }
 
   Future<void> ajouterSeance(Map<String, dynamic> seance) async {
     sessionsSauvegardees.add(seance);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('sessions_sauvegardees', jsonEncode(sessionsSauvegardees));
+    await sauvegarder();
   }
 
   Future<void> supprimerSeance(int index) async {
     if (index >= 0 && index < sessionsSauvegardees.length) {
       sessionsSauvegardees.removeAt(index);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('sessions_sauvegardees', jsonEncode(sessionsSauvegardees));
+      await sauvegarder();
     }
+  }
+
+  Future<void> ajouterExerciceComplet(ExerciseModel exo) async {
+    int index = exercicesDisponibles.indexWhere((e) => e.nom.trim().toLowerCase() == exo.nom.trim().toLowerCase());
+    if (index != -1) {
+      exercicesDisponibles[index] = exo;
+    } else {
+      exercicesDisponibles.add(exo);
+    }
+    await sauvegarder();
+  }
+
+  Future<void> modifierExerciceComplet(String ancienNom, ExerciseModel modifie) async {
+    int index = exercicesDisponibles.indexWhere((e) => e.nom.toLowerCase() == ancienNom.toLowerCase());
+    if (index != -1) {
+      exercicesDisponibles[index] = modifie;
+      for (var session in sessionsSauvegardees) {
+        if (session['exercice'] == ancienNom) {
+          session['exercice'] = modifie.nom;
+        }
+      }
+      await sauvegarder();
+    }
+  }
+
+  Future<void> supprimerExerciceComplet(String nom) async {
+    exercicesDisponibles.removeWhere((e) => e.nom.toLowerCase() == nom.toLowerCase());
+    await sauvegarder();
   }
 }
