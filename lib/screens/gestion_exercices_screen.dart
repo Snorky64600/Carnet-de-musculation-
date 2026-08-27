@@ -196,7 +196,6 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
     );
   }
 }
-
 class FormulaireExerciceModal extends StatefulWidget {
   final ExerciseModel? exoAEditer;
   final VoidCallback onSave;
@@ -238,6 +237,12 @@ class _FormulaireExerciceModalState extends State<FormulaireExerciceModal> {
         _imagesPath.add(image.path);
       });
     }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _imagesPath.removeAt(index);
+    });
   }
 
   void _saveExercice() async {
@@ -349,12 +354,44 @@ class _FormulaireExerciceModalState extends State<FormulaireExerciceModal> {
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: _imagesPath.map((path) => Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            width: 50, height: 50,
-                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: Colors.white10),
-                            child: buildMediaWidget(path, fit: BoxFit.cover),
-                          )).toList(),
+                          children: _imagesPath.asMap().entries.map((entry) {
+                            int idx = entry.key;
+                            String path = entry.value;
+
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.only(right: 12, top: 6),
+                                  width: 54,
+                                  height: 54,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    color: Colors.white10,
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: buildMediaWidget(path, fit: BoxFit.cover),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 0,
+                                  right: 6,
+                                  child: GestureDetector(
+                                    onTap: () => _removeImage(idx),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.redAccent,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.close, color: Colors.white, size: 12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
                         ),
                       ),
                     ),
