@@ -14,14 +14,6 @@ class GestionExercicesScreen extends StatefulWidget {
 class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
   String _searchQuery = '';
 
-  @override
-  void initState() {
-    super.initState();
-    DatabaseHelper.instance.chargerExercicesCustom().then((_) {
-      if (mounted) setState(() {});
-    });
-  }
-
   Widget _buildFormattedText(String text) {
     List<TextSpan> spans = [];
     RegExp exp = RegExp(r'\*\*(.*?)\*\*');
@@ -71,11 +63,11 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
     ) ?? false;
 
     if (confirm) {
-      setState(() {
-        DatabaseHelper.instance.exercicesDisponibles.removeWhere((e) => e.nom == exo.nom);
-      });
-      await DatabaseHelper.instance.sauvegarderExercicesCustom();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Exercice supprimé.")));
+      await DatabaseHelper.instance.supprimerExerciceComplet(exo.nom);
+      setState(() {});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Exercice supprimé.")));
+      }
     }
   }
 
@@ -87,10 +79,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (context) => FormulaireExerciceModal(
         exoAEditer: exoAEditer,
-        onSave: () async {
-          await DatabaseHelper.instance.sauvegarderExercicesCustom();
-          if (mounted) setState(() {});
-        },
+        onSave: () => setState(() {}),
       ),
     );
   }
@@ -207,6 +196,7 @@ class _GestionExercicesScreenState extends State<GestionExercicesScreen> {
     );
   }
 }
+
 class FormulaireExerciceModal extends StatefulWidget {
   final ExerciseModel? exoAEditer;
   final VoidCallback onSave;
@@ -277,16 +267,13 @@ class _FormulaireExerciceModalState extends State<FormulaireExerciceModal> {
     );
 
     if (widget.exoAEditer != null) {
-      int index = DatabaseHelper.instance.exercicesDisponibles.indexOf(widget.exoAEditer!);
-      if (index != -1) {
-        DatabaseHelper.instance.exercicesDisponibles[index] = newExo;
-      }
+      await DatabaseHelper.instance.modifierExerciceComplet(widget.exoAEditer!.nom, newExo);
     } else {
-      DatabaseHelper.instance.exercicesDisponibles.add(newExo);
+      await DatabaseHelper.instance.ajouterExerciceComplet(newExo);
     }
 
     widget.onSave();
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
   }
 
   @override
